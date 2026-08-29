@@ -1,0 +1,57 @@
+# iCOOL HVAC AI CAD Platform - Python Dependencies
+# Generated: 2026-07-25
+
+# Web Framework
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+
+# Data Validation
+pydantic==2.8.2
+pydantic-settings==2.3.4
+email-validator==2.2.0
+
+# Database
+sqlalchemy==2.0.31
+geoalchemy2==0.15.2
+psycopg2-binary==2.9.9
+alembic==1.13.2
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# CAD Engine
+ezdxf==1.3.2
+shapely==2.0.4
+numpy==1.26.4
+
+# AI Layer
+openai==1.35.0
+anthropic==0.31.0
+
+# Export / Reports
+reportlab==4.2.2
+pandas==2.2.2
+openpyxl==3.1.5
+xlsxwriter==3.2.0
+
+# Async Tasks
+celery==5.4.0
+redis==5.0.7
+
+# Storage
+boto3==1.34.0
+minio==7.2.7
+
+# Monitoring
+prometheus-client==0.20.0
+
+# Testing
+pytest==8.2.2
+pytest-asyncio==0.23.7
+httpx==0.27.0
+
+# Utilities
+jinja2==3.1.4
+python-dotenv==1.0.1
