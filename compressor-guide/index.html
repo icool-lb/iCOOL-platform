@@ -128,6 +128,7 @@ h3.sec{font-family:var(--f-display);font-size:1rem;margin:18px 0 8px}
 .shot img{width:96px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 .spin{display:inline-block;width:18px;height:18px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp 1s linear infinite;vertical-align:middle}
 @keyframes sp{to{transform:rotate(360deg)}}
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pick .btn{padding:16px 10px;font-size:1rem}
 .busy{display:flex;gap:10px;align-items:center;padding:18px 4px;color:var(--muted)}
 
 .adm{display:grid;gap:14px}
@@ -178,7 +179,8 @@ h3.sec{font-family:var(--f-display);font-size:1rem;margin:18px 0 8px}
         <input id="q" type="search" placeholder="اكتب رقم الموديل… مثال: NE6181E أو FFU80" autocomplete="off" aria-label="بحث برقم الموديل">
         <button class="btn sm" id="b-photo" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>صورة البلاكة</button>
         <button class="btn ghost sm" id="b-cap" type="button" aria-pressed="false">بحث بالقدرة</button>
-        <input id="photo-in" type="file" accept="image/*" capture="environment" hidden>
+        <input id="photo-cam" type="file" accept="image/*" capture="environment" hidden>
+        <input id="photo-lib" type="file" accept="image/*" hidden>
       </div>
       <div class="capbox" id="capbox">
         <label for="cap-v">القدرة</label>
@@ -413,6 +415,13 @@ function matchPlate(pl){
   return[...hits.entries()].map(([i,s])=>{const o=ROWS[i];const bb=brand&&o.bn.toLowerCase().includes(brand.slice(0,4))?5:0;return{o,s:s+bb}}).sort((a,b)=>b.s-a.s).slice(0,20);
 }
 let lastPlate=null,lastShot=null;
+const CAM_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+const LIB_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>';
+function photoPick(){
+  setSheet(`<div class="sheet-head"><h2 class="t">صورة البلاكة</h2><button class="x" type="button" data-close aria-label="إغلاق">×</button></div>
+   <p class="stat" style="font-size:.9rem;margin:8px 0 14px">صوّر البلاكة من قريب وبإضاءة جيدة، أو اختر صورة محفوظة على الهاتف.</p>
+   <div class="pick"><button class="btn" type="button" data-pick="cam">${CAM_SVG}الكاميرا</button><button class="btn ghost" type="button" data-pick="lib">${LIB_SVG}من الاستوديو</button></div>`);
+}
 async function photoFlow(file){
   setSheet(`<div class="sheet-head"><h2 class="t">قراءة البلاكة</h2><button class="x" type="button" data-close aria-label="إغلاق">×</button></div><div class="busy"><span class="spin"></span>جارِ قراءة الصورة… قد يستغرق ذلك حتى ٢٠ ثانية</div>`);
   let img;try{img=await shrink(file)}catch(e){return setSheet(sheetErr("قراءة البلاكة","تعذّر فتح الصورة. جرّب صورة أخرى."))}
@@ -473,10 +482,11 @@ function wire(){
   ["#cap-v","#cap-u","#cap-g","#cap-t"].forEach(s=>$(s).addEventListener("input",()=>{S.shown=60;render()}));
   $("#b-more").addEventListener("click",()=>{S.shown+=100;render()});
   $("#b-logout").addEventListener("click",()=>{store.del();location.reload()});
-  $("#b-photo").addEventListener("click",()=>$("#photo-in").click());
-  $("#photo-in").addEventListener("change",e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(f)photoFlow(f)});
+  $("#b-photo").addEventListener("click",photoPick);
+  ["#photo-cam","#photo-lib"].forEach(id=>$(id).addEventListener("change",e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(f)photoFlow(f)}));
 }
 document.addEventListener("click",e=>{
+  const pk=e.target.closest("[data-pick]");if(pk){$(pk.dataset.pick==="cam"?"#photo-cam":"#photo-lib").click();return}
   const lk=e.target.closest("[data-lookup]");if(lk){lookupFlow(lk.dataset.lookup,lk.dataset.brand||"",!!lk.dataset.plate);return}
   const r=e.target.closest(".row[data-i]");if(r){showDetail(ROWS[+r.dataset.i]);return}
   if(e.target.closest("[data-close]")||e.target.id==="ov"){closeSheet();return}
