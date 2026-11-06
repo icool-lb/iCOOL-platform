@@ -72,6 +72,9 @@ export default async function handler(req, res) {
     return send(res, 200, { ok: true, result: r, saved, left: q.left });
   } catch (e) {
     console.error("lookup", e);
-    return send(res, 500, { ok: false, err: "server", detail: String(e.message || e).slice(0, 300) });
+    const msg = String(e.message || e);
+    if (/customer_verification_required|credit card|insufficient|quota|402/i.test(msg))
+      return send(res, 503, { ok: false, err: "ai_setup" });
+    return send(res, 500, { ok: false, err: "server", detail: msg.slice(0, 300) });
   }
 }
