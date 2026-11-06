@@ -1,0 +1,6 @@
+{
+  "name": "icool-compressor-guide",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "22.x" }
+}
