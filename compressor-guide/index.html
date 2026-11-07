@@ -38,6 +38,8 @@ html,body{background:var(--bg);color:var(--ink);margin:0}
 body{font-family:var(--f-body);font-size:15px;line-height:1.55}
 img{max-width:100%}
 button,input,select{font:inherit;color:inherit}
+/* iOS zooms into any focused field under 16px and stays zoomed — keep every field at 16px */
+input,select,textarea{font-size:16px!important}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 a{color:var(--blue)}
