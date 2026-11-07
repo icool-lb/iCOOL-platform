@@ -40,9 +40,9 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error("plate", e);
     const msg = String(e.message || e);
-    if (/customer_verification_required|credit card|insufficient|402|gemini_key/i.test(msg))
+    if (/customer_verification_required|credit card|402|ai_key/i.test(msg))
       return send(res, 503, { ok: false, err: "ai_setup" });
-    if (/gemini_quota/.test(msg)) return send(res, 429, { ok: false, err: "ai_busy" });
+    if (/ai_busy/.test(msg)) return send(res, 429, { ok: false, err: "ai_busy" });
     return send(res, 500, { ok: false, err: "server", detail: msg.slice(0, 300) });
   }
 }
