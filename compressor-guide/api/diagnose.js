@@ -108,6 +108,8 @@ export default async function handler(req, res) {
     }
 
     if (stage === "review") {
+      // one paid review per case: an existing plan is returned instead of calling OpenAI again
+      if (c.result && Array.isArray(c.result.steps)) return send(res, 200, { ok: true, result: c.result, cached: true });
       const research = (c.result && c.result.research) || {};
       const prompt = `${REVIEW_SYS}
 
