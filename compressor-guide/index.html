@@ -201,6 +201,8 @@ header.top::after{content:"";position:absolute;inset:auto 0 -1px;height:3px;back
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .switch{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border-radius:var(--r);border:1px solid var(--line);flex-wrap:wrap}
 .xrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.adm select{padding:9px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);width:100%}
 .loglist{font-size:.84rem;color:var(--muted);display:grid;gap:2px}
 @media (max-width:520px){.crow{grid-template-columns:minmax(0,1fr)}}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}}
@@ -252,7 +254,7 @@ header.top::after{content:"";position:absolute;inset:auto 0 -1px;height:3px;back
         <select id="cap-t" aria-label="السماحية"><option value="0.05">±5%</option><option value="0.1" selected>±10%</option><option value="0.2">±20%</option></select>
       </div>
       <div class="filters">
-        <select id="f-brand" aria-label="الشركة"><option value="">كل الشركات</option><option value="ext">مضافة من بحث خارجي</option></select>
+        <select id="f-brand" aria-label="الشركة"><option value="">كل الشركات</option><option value="ext">تحديثات iCOOL المضافة</option></select>
         <select id="f-ref" aria-label="الفريون"><option value="">كل أنواع الفريون</option></select>
         <div class="chips" id="f-app">
           <button class="chip" type="button" data-app="" aria-pressed="true">كل التطبيقات</button>
@@ -267,7 +269,7 @@ header.top::after{content:"";position:absolute;inset:auto 0 -1px;height:3px;back
     <div class="meta-line"><span id="res-line"></span><span>اضغط على أي موديل لعرض كامل المواصفات والبدائل</span></div>
     <div class="list" id="list"></div>
     <div class="more"><button class="btn ghost" id="b-more" type="button" hidden>عرض المزيد</button></div>
-    <div class="note">القدرات مأخوذة حسب ASHRAE: التجميد LBP عند −23.3 °C، التبريد MBP عند −6.7 °C، HBP والتكييف عند +7.2 °C. بعض الكتالوجات (مثل تيكومسيه 2) بنظام CECOMAF الأوروبي: التجميد عند −25 °C وHBP عند +5 °C. الموديلات المعلَّمة «بحث خارجي» جُمعت من الإنترنت ولم تُراجَع بعد. تأكد دائماً من القدرة قبل التركيب.</div>
+    <div class="note">القدرات مأخوذة حسب ASHRAE: التجميد LBP عند −23.3 °C، التبريد MBP عند −6.7 °C، HBP والتكييف عند +7.2 °C. بعض الكتالوجات (مثل تيكومسيه 2) بنظام CECOMAF الأوروبي: التجميد عند −25 °C وHBP عند +5 °C. الموديلات المعلَّمة «تحديث iCOOL» أضافتها الإدارة بعد الكتالوج الأساسي. تأكد دائماً من القدرة قبل التركيب.</div>
   </main>
   <footer class="wrap foot">
     <span>iCOOL Trading &amp; Contracting · <span class="mono">03 715 512</span> · info.icool.lb@gmail.com</span>
@@ -341,7 +343,8 @@ function extToRow(e){
   const s=e.spec||{},caps={};
   (s.capacities||[]).forEach(c=>{const t=parseFloat(c.evap_c),w=parseFloat(c.watts);if(isFinite(t)&&w>0&&caps[t]==null)caps[t]=Math.round(w)});
   const notes=[s.type,s.voltage&&("الجهد: "+s.voltage),s.lra&&("LRA: "+s.lra),s.notes_ar].filter(Boolean).join(" | ");
-  return finish({i:ROWS.length,b:-1,bn:e.brand||"—",m:String(e.model),hp:s.hp||"",w:s.watts_input||"",hz:s.hz||"",rla:s.rla||"",disp:s.displacement_cc||"",rpm:s.rpm||"",
+  const bi=BR.findIndex(x=>x.trim().toLowerCase()===String(e.brand||"").trim().toLowerCase());
+  return finish({i:ROWS.length,b:bi,bn:e.brand||"—",m:String(e.model),hp:s.hp||"",w:s.watts_input||"",hz:s.hz||"",rla:s.rla||"",disp:s.displacement_cc||"",rpm:s.rpm||"",
     app:String(s.application||"").toUpperCase().replace(/\s+/g,""),ref:refNorm(s.refrigerant),caps,kcal:"",runcap:s.run_cap_uf||"",startcap:s.start_cap_uf||"",oil:s.oil_cc?s.oil_cc+" cc":"",notes,
     ext:{id:e.id,verified:!!e.verified,sources:e.sources||[],confidence:s.confidence||"",origin:e.origin||"web"}});
 }
@@ -365,7 +368,7 @@ function capCell(o){
 }
 function pills(o,extra=""){
   const p=[];
-  if(o.ext)p.push(o.ext.verified?'<span class="pill ver">موثّق ✓</span>':'<span class="pill ext">بحث خارجي</span>');
+  if(o.ext)p.push(o.ext.origin==="admin"||o.ext.verified?'<span class="pill ver">تحديث iCOOL</span>':'<span class="pill ext">غير مراجَع</span>');
   if(o.ref)p.push(`<span class="pill ref">${esc(o.ref)}</span>`);
   if(o.app)p.push(`<span class="pill ${o.ag.has("L")&&!o.ag.has("H")?"L":o.ag.has("H")&&!o.ag.has("L")?"H":""}">${esc(o.app)}</span>`);
   const hp=hpTxt(o.hp);if(hp)p.push(`<span class="pill">${esc(hp)} HP</span>`);
@@ -407,7 +410,7 @@ function render(){
   $("#res-line").textContent=out.length?`${out.length.toLocaleString("en-US")} نتيجة`:"";
   if(!out.length){
     const q=S.q.trim();
-    list.innerHTML=`<div class="empty"><span>لا توجد نتائج داخل المنصة${q?` لـ «<span class="mono">${esc(q)}</span>»`:""}.</span>${q&&norm(q).length>=4?`<button class="btn warn" type="button" data-lookup="${esc(q)}">ابحث عن «${esc(q)}» خارج المنصة</button><span class="stat">يبحث في الإنترنت ويضيف الموديل إلى قاعدة البيانات</span>`:"<span>جرّب جزءاً أقصر من رقم الموديل أو وسّع السماحية.</span>"}</div>`;
+    list.innerHTML=`<div class="empty"><span>لا توجد نتائج${q?` لـ «<span class="mono">${esc(q)}</span>»`:""}.</span><span>جرّب جزءاً أقصر من رقم الموديل، أو صوّر البلاكة، أو وسّع السماحية.</span></div>`;
     $("#b-more").hidden=true;return;
   }
   list.innerHTML=out.slice(0,S.shown).map(o=>rowHTML(o,ct?`<span class="pill diff">${o._d>=0?"+":""}${(o._d*100).toFixed(1)}%</span>`:"")).join("");
@@ -450,7 +453,7 @@ function detailHTML(o,withEq=true){
    </div>
    ${caps?`<h3 class="sec">قدرة التبريد حسب درجة التبخير</h3>${thermo(o)}<div style="overflow-x:auto"><table class="caps-t"><thead><tr><th>درجة التبخير</th><th>W</th><th>kcal/h</th><th>BTU/h</th></tr></thead><tbody>${caps}</tbody></table></div>`:""}
    ${o.notes?`<div class="note">${esc(o.notes)}</div>`:""}
-   ${o.ext?`<div class="msg ${o.ext.verified?"ok":"info"}" style="margin-top:12px">${o.ext.verified?"موديل أُضيف من بحث خارجي وراجعته الإدارة.":"موديل أُضيف من بحث خارجي ولم تراجعه الإدارة بعد"+(o.ext.confidence?` (درجة الثقة: ${esc({high:"عالية",medium:"متوسطة",low:"منخفضة"}[o.ext.confidence]||o.ext.confidence)})`:"")+". تحقّق من المصادر قبل الاعتماد عليه."}</div>${srcList(o.ext.sources)}`:""}
+   ${o.ext?(o.ext.origin==="admin"||o.ext.verified?`<div class="msg ok" style="margin-top:12px">موديل أضافته إدارة iCOOL كتحديث على الكتالوج.</div>`:`<div class="msg info" style="margin-top:12px">موديل قديم من بحث خارجي ولم تراجعه الإدارة بعد. تحقّق منه قبل الاعتماد عليه.</div>${srcList(o.ext.sources)}`):""}
    ${withEq?`<h3 class="sec">بدائل بنفس الفريون وقدرة قريبة (±10%)</h3>
    <div class="list eq">${eq.length?eq.map(r=>rowHTML(r.x,`<span class="pill diff">${r.d>=0?"+":""}${(r.d*100).toFixed(1)}%</span>`)).join(""):'<div class="empty" style="padding:16px">لا توجد بدائل مسجلة بنفس الفريون والقدرة.</div>'}</div>`:""}`;
 }
@@ -507,35 +510,18 @@ async function photoFlow(file){
   if(pl.legible===false&&!pl.model)return setSheet(sheetErr("قراءة البلاكة","الصورة غير واضحة أو ليست بلاكة كباس. صوّر البلاكة من قريب وبإضاءة جيدة."));
   const hits=matchPlate(pl);
   const exact=hits.filter(h=>h.s>=95);
+  let reported=false;
+  if(!exact.length&&pl.model){try{const r=await rpc("cmp_missing_add",{p_code:CODE,p_row:{model:pl.model,brand:pl.brand||"",plate:pl}});reported=!!(r&&r.ok)}catch(e){}}
   setSheet(`<div class="sheet-head"><h2 class="t">نتيجة قراءة البلاكة</h2><button class="x" type="button" data-close aria-label="إغلاق">×</button></div>
    <div class="shot"><img src="${img}" alt="صورة البلاكة"><div><div class="mono" style="font-size:1.3rem;font-weight:600">${esc(pl.model||"—")}</div><div class="stat">${esc(pl.brand||"شركة غير مقروءة")}</div></div></div>
    <div class="specs">${spec("الفريون",pl.refrigerant)}${spec("الجهد",pl.voltage)}${spec("التردد",pl.hz,"Hz")}${spec("الطور",pl.phase)}${spec("RLA",pl.rla,"A")}${spec("LRA",pl.lra,"A")}${spec("القدرة الحصانية",pl.hp,"HP")}${spec("التطبيق",pl.application)}</div>
    ${pl.other?`<div class="note" style="margin-top:0">${esc(pl.other)}</div>`:""}
    <h3 class="sec">${hits.length?(exact.length?"موجود في المنصة":"موديلات قريبة في المنصة"):"غير موجود في المنصة"}</h3>
    <div class="list eq">${hits.map(h=>rowHTML(h.o,h.s>=95?'<span class="pill ver">مطابق</span>':'<span class="pill">قريب</span>')).join("")||'<div class="stat">لم نجد هذا الموديل ضمن الموديلات المسجّلة.</div>'}</div>
-   ${pl.model?`<div class="bar" style="margin-top:14px"><button class="btn ${exact.length?"ghost":"warn"}" type="button" data-lookup="${esc(pl.model)}" data-brand="${esc(pl.brand||"")}" data-plate="1">${exact.length?"بحث إضافي خارج المنصة":"ابحث خارج المنصة وأضِفه"}</button><span class="stat">يبحث في الإنترنت عن مواصفات ${esc(pl.model)} ويضيفها لقاعدة البيانات</span></div>`:""}
+   ${!exact.length&&pl.model?`<div class="msg info" style="margin-top:14px">${reported?"سُجِّل هذا الموديل لدى إدارة iCOOL لإضافته إلى المنصة في التحديث القادم.":"هذا الموديل غير موجود في المنصة بعد."}</div>`:""}
    <div class="stat" style="margin-top:10px">${typeof j.left==="number"?`متبقٍّ اليوم: ${j.left} عملية ذكاء اصطناعي`:""}</div>`);
 }
 function sheetErr(t,m){return`<div class="sheet-head"><h2 class="t">${esc(t)}</h2><button class="x" type="button" data-close aria-label="إغلاق">×</button></div><div class="msg bad" style="margin-top:12px">${esc(m)}</div>`}
-
-/* ---------- external lookup ---------- */
-async function lookupFlow(model,brand,usePlate){
-  setSheet(`<div class="sheet-head"><h2 class="t">بحث خارج المنصة</h2><button class="x" type="button" data-close aria-label="إغلاق">×</button></div><div class="busy"><svg class="loader" aria-hidden="true"><use href="#g-split"/></svg>جارِ البحث عن <span class="mono">${esc(model)}</span> في الإنترنت… قد يستغرق حتى ٤٠ ثانية</div>`);
-  const j=await api("api/lookup",{code:CODE,model,brand:brand||"",plate:usePlate?lastPlate:null});
-  if(!j.ok){if(j.err==="denied")return kick();return setSheet(sheetErr("بحث خارج المنصة",errTxt(j)))}
-  const r=j.result||{};
-  if(!r.found){
-    return setSheet(`<div class="sheet-head"><h2 class="t">بحث خارج المنصة</h2><button class="x" type="button" data-close aria-label="إغلاق">×</button></div>
-      <div class="msg bad" style="margin-top:12px">لم نجد مواصفات موثوقة للموديل <span class="mono">${esc(model)}</span> على الإنترنت، فلم يُضَف شيء.</div>
-      ${r.spec&&r.spec.notes_ar?`<div class="note">${esc(r.spec.notes_ar)}</div>`:""}${srcList(r.sources)}`);
-  }
-  let o=null;
-  if(j.saved&&j.saved.ok){o=addExtra({id:j.saved.id,brand:r.brand||brand,model:r.model||model,spec:r.spec,sources:r.sources,verified:false,origin:usePlate?"plate+web":"web"});render()}
-  else o=extToRow({brand:r.brand||brand,model:r.model||model,spec:r.spec,sources:r.sources});
-  setSheet(`<div class="sheet-head"><div><h2 class="mono">${esc(o.m)}</h2><div class="b">${esc(o.bn)}</div></div><button class="x" type="button" data-close aria-label="إغلاق">×</button></div>
-    <div class="msg ${j.saved&&j.saved.ok?"ok":"info"}" style="margin-top:12px">${j.saved&&j.saved.ok?"وُجد على الإنترنت وأُضيف إلى قاعدة بيانات المنصة. سيظهر لكل المعلمين معلَّماً «بحث خارجي» حتى تراجعه الإدارة.":"وُجدت معلومات جزئية فقط، فلم يُضَف إلى قاعدة البيانات."}</div>
-    ${detailHTML(o,!!o.main)}`);
-}
 
 /* ---------- filters / wiring ---------- */
 function fillFilters(){
@@ -545,7 +531,7 @@ function fillFilters(){
   $("#f-ref").insertAdjacentHTML("beforeend",Object.keys(rc).sort((a,b)=>rc[b]-rc[a]).map(r=>`<option value="${esc(r)}">${esc(r)} (${rc[r]})</option>`).join(""));
   countLine();
 }
-function countLine(){const n=ROWS.filter(o=>o.ext).length;$("#count-line").textContent=`${ROWS.length.toLocaleString("en-US")} موديل · ${BR.length} شركة${n?` · ${n} من بحث خارجي`:""}`}
+function countLine(){const n=ROWS.filter(o=>o.ext).length;$("#count-line").textContent=`${ROWS.length.toLocaleString("en-US")} موديل · ${BR.length} شركة${n?` · ${n} تحديث iCOOL`:""}`}
 let wired=false;
 function wire(){
   if(wired)return;wired=true;
@@ -562,7 +548,6 @@ function wire(){
 }
 document.addEventListener("click",e=>{
   const pk=e.target.closest("[data-pick]");if(pk){$(pk.dataset.pick==="cam"?"#photo-cam":"#photo-lib").click();return}
-  const lk=e.target.closest("[data-lookup]");if(lk){lookupFlow(lk.dataset.lookup,lk.dataset.brand||"",!!lk.dataset.plate);return}
   const r=e.target.closest(".row[data-i]");if(r){showDetail(ROWS[+r.dataset.i]);return}
   if(e.target.closest("[data-close]")||e.target.id==="ov"){closeSheet();return}
   if(e.target.closest("[data-admin]"))adminOpen();
@@ -662,6 +647,80 @@ async function adm(action,args,okMsg){
     AD=j;adminPanel(okMsg?{t:okMsg,c:"ok"}:null);
   }catch(e){adminPanel({t:"تعذّر الاتصال بالخادم.",c:"bad"})}
 }
+/* ---- model updates (admin) ---- */
+const CAPT={L:-23.3,M:-6.7,H:7.2};
+function specLine(sp){sp=sp||{};const c=(sp.capacities||[]).map(x=>`${Math.round(x.watts)}W@${x.evap_c}`).join(" ");return[sp.hp&&sp.hp+" HP",sp.refrigerant,sp.application,c].filter(Boolean).join(" · ")}
+function specToForm(sp){sp=sp||{};const f={hp:sp.hp||"",ref:sp.refrigerant||"",app:sp.application||"",rla:sp.rla||"",disp:sp.displacement_cc||"",runcap:sp.run_cap_uf||"",volt:sp.voltage||"",notes:sp.notes_ar||""};
+  (sp.capacities||[]).forEach(c=>{const g=grp(+c.evap_c);f["c"+g]=c.watts});return f}
+const numOr=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:(String(v||"").trim()||null)};
+function buildSpec(f){
+  const caps=[];["L","M","H"].forEach(g=>{const w=parseFloat(String(f["c"+g]||"").replace(",","."));if(w>0)caps.push({evap_c:CAPT[g],watts:Math.round(w),standard:"ASHRAE"})});
+  const sp={hp:String(f.hp||"").trim(),refrigerant:refNorm(f.ref),application:String(f.app||"").toUpperCase().replace(/\s+/g,""),capacities:caps,
+    rla:numOr(f.rla),displacement_cc:numOr(f.disp),run_cap_uf:String(f.runcap||"").trim(),voltage:String(f.volt||"").trim(),notes_ar:String(f.notes||"").trim()};
+  Object.keys(sp).forEach(k=>{if(sp[k]===""||sp[k]==null||(Array.isArray(sp[k])&&!sp[k].length))delete sp[k]});return sp;
+}
+function modelForm(f){
+  const fld=(id,lbl,val,extra="")=>`<div class="field"><label for="mf-${id}">${lbl}</label><input type="text" id="mf-${id}" value="${esc(val||"")}" ${extra}></div>`;
+  setSheet(`<form class="adm" id="f-model" autocomplete="off">
+    <div class="sheet-head"><h2 class="t">${f.model?"تعديل / إضافة موديل":"إضافة موديل"}</h2><button class="x" type="button" data-back aria-label="رجوع">→</button></div>
+    <div class="mgrid">${fld("brand","الشركة",f.brand)}${fld("model","الموديل *",f.model,'dir="ltr" required')}
+    ${fld("hp","القدرة الحصانية HP",f.hp,'dir="ltr" placeholder="1/4"')}${fld("ref","الفريون",f.ref,'dir="ltr" placeholder="R134a" list="mf-refs"')}
+    <div class="field"><label for="mf-app">التطبيق</label><select id="mf-app">${["","LBP","MBP","HBP","L/MBP","M/HBP","L/M/HBP","AC"].map(v=>`<option ${String(f.app||"")===v?"selected":""}>${v}</option>`).join("")}</select></div>
+    ${fld("rla","التيار RLA (A)",f.rla,'dir="ltr" inputmode="decimal"')}
+    ${fld("cL","قدرة W عند <span dir=\"ltr\">−23.3 °C</span> (LBP)",f.cL,'dir="ltr" inputmode="decimal"')}${fld("cM","قدرة W عند <span dir=\"ltr\">−6.7 °C</span> (MBP)",f.cM,'dir="ltr" inputmode="decimal"')}
+    ${fld("cH","قدرة W عند <span dir=\"ltr\">+7.2 °C</span> (HBP)",f.cH,'dir="ltr" inputmode="decimal"')}${fld("disp","الإزاحة cc",f.disp,'dir="ltr" inputmode="decimal"')}
+    ${fld("runcap","مكثف التشغيل µF",f.runcap,'dir="ltr"')}${fld("volt","الجهد",f.volt,'dir="ltr" placeholder="220-240V 50Hz"')}</div>
+    ${fld("notes","ملاحظات",f.notes)}
+    <datalist id="mf-refs">${["R134a","R600a","R290","R22","R404A","R410A","R407C","R32","R12","R502","R507"].map(r=>`<option value="${r}">`).join("")}</datalist>
+    <div class="stat">القدرة بالواط. للتحويل: BTU/h ÷ 3.412 ، kcal/h ÷ 0.86</div>
+    <div class="bar"><button class="btn" type="submit" id="mf-save">حفظ الموديل</button><button class="btn ghost" type="button" data-back>إلغاء</button></div>
+    <div class="msg bad" id="mf-msg" hidden></div></form>`);
+  $("#sheet").onclick=e=>{if(e.target.closest("[data-back]"))adminPanel()};
+  $("#f-model").addEventListener("submit",async e=>{
+    e.preventDefault();const g=id=>$("#mf-"+id).value;
+    const v={brand:g("brand").trim(),model:g("model").trim(),hp:g("hp"),ref:g("ref"),app:g("app"),rla:g("rla"),cL:g("cL"),cM:g("cM"),cH:g("cH"),disp:g("disp"),runcap:g("runcap"),volt:g("volt"),notes:g("notes")};
+    if(norm(v.model).length<2){const m=$("#mf-msg");m.textContent="اكتب رقم الموديل.";m.hidden=false;return}
+    $("#mf-save").disabled=true;
+    await adm("models_upsert",{rows:[{brand:v.brand,model:v.model,spec:buildSpec(v)}]},`تم حفظ الموديل ${v.model}.`);
+  });
+}
+const TPL_HEAD=["الشركة Brand","الموديل Model","الحصان HP","الفريون Refrigerant","التطبيق Application","قدرة W عند -23.3 (LBP)","قدرة W عند -6.7 (MBP)","قدرة W عند +7.2 (HBP)","التيار RLA","الإزاحة cc","مكثف التشغيل µF","الجهد Voltage","ملاحظات Notes"];
+let xlsxP=null;
+function loadXLSX(){return xlsxP||(xlsxP=new Promise((ok,no)=>{const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";sc.onload=()=>ok(window.XLSX);sc.onerror=()=>{xlsxP=null;no(new Error("xlsx"))};document.head.appendChild(sc)}))}
+async function downloadTemplate(){
+  try{const X=await loadXLSX();const ws=X.utils.aoa_to_sheet([TPL_HEAD,["Embraco","NEK6213Z","1/3","R134a","MBP","","620","","2.1","12.11","","220-240V 50Hz","مثال — احذف هذا السطر"]]);
+    ws["!cols"]=TPL_HEAD.map(()=>({wch:18}));const wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,"Models");X.writeFile(wb,"icool-compressor-models-template.xlsx");
+  }catch(e){adminPanel({t:"تعذّر تحميل أداة Excel. تحقّق من الإنترنت.",c:"bad"})}
+}
+function headKey(h){h=String(h||"").toLowerCase();
+  if(/-?23|lbp/.test(h)&&/قدرة|w|cap/.test(h))return"cL";if(/6[.,]7|mbp|-5\b/.test(h)&&/قدرة|w|cap/.test(h))return"cM";if(/7[.,]2|hbp|\+5/.test(h)&&/قدرة|w|cap/.test(h))return"cH";
+  if(/الشركة|brand|make/.test(h))return"brand";if(/الموديل|model/.test(h))return"model";if(/الحصان|\bhp\b|horse/.test(h))return"hp";if(/الفريون|refrig|gas/.test(h))return"ref";
+  if(/التطبيق|appl/.test(h))return"app";if(/rla|التيار/.test(h))return"rla";if(/الإزاحة|الازاحة|displ|\bcc\b/.test(h))return"disp";if(/مكثف|capacitor|µf|uf/.test(h))return"runcap";
+  if(/الجهد|volt/.test(h))return"volt";if(/ملاحظ|note/.test(h))return"notes";return null}
+async function importFile(file){
+  let X;try{X=await loadXLSX()}catch(e){return adminPanel({t:"تعذّر تحميل أداة Excel. تحقّق من الإنترنت.",c:"bad"})}
+  let rows;try{const wb=X.read(await file.arrayBuffer());rows=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""})}catch(e){return adminPanel({t:"تعذّر قراءة الملف. استعمل نموذج Excel.",c:"bad"})}
+  const hi=rows.findIndex(r=>r.map(headKey).includes("model"));
+  if(hi<0)return adminPanel({t:"لم أجد عمود «الموديل» في الملف. استعمل نموذج Excel.",c:"bad"});
+  const keys=rows[hi].map(headKey);const out=[];let skipped=0;
+  for(const r of rows.slice(hi+1)){const f={};keys.forEach((k,i)=>{if(k&&f[k]==null)f[k]=r[i]});
+    if(norm(f.model).length<2){if(r.some(c=>String(c).trim()))skipped++;continue}
+    if(String(f.notes||"").includes("احذف هذا السطر"))continue;
+    out.push({brand:String(f.brand||"").trim(),model:String(f.model).trim(),spec:buildSpec(f)});}
+  if(!out.length)return adminPanel({t:"لا توجد موديلات صالحة في الملف.",c:"bad"});
+  setSheet(`<div class="adm"><div class="sheet-head"><h2 class="t">رفع ملف الموديلات</h2><button class="x" type="button" data-back aria-label="رجوع">→</button></div>
+    <div class="msg info">${out.length} موديل جاهز للرفع${skipped?` · ${skipped} سطر بدون رقم موديل سيُتجاهل`:""}.</div>
+    <div class="codes">${out.slice(0,8).map(x=>`<div class="xrow"><div><span class="mono" style="font-weight:600">${esc(x.model)}</span> <span class="stat">${esc(x.brand)}</span><div class="stat">${esc(specLine(x.spec))||"بدون مواصفات"}</div></div></div>`).join("")}${out.length>8?`<div class="stat">… و${out.length-8} غيرها</div>`:""}</div>
+    <div class="bar"><button class="btn" type="button" id="up-go">رفع ${out.length} موديل</button><button class="btn ghost" type="button" data-back>إلغاء</button></div><div class="stat" id="up-st"></div></div>`);
+  $("#sheet").onclick=e=>{if(e.target.closest("[data-back]"))adminPanel()};
+  $("#up-go").addEventListener("click",async()=>{
+    $("#up-go").disabled=true;let done=0;
+    try{for(let i=0;i<out.length;i+=250){const j=await rpc("cmp_admin",{p_pass:AP,p_action:"models_upsert",p_args:{rows:out.slice(i,i+250)}});
+        if(!j.ok)throw new Error(j.err);done+=j.saved;AD=j;$("#up-st").textContent=`تم ${done} من ${out.length}…`}
+      adminPanel({t:`تم رفع ${done} موديل.`,c:"ok"});
+    }catch(e){adminPanel({t:`توقف الرفع بعد ${done} موديل: ${ADMERR[e.message]||"خطأ في الاتصال"}.`,c:"bad"})}
+  });
+}
 const dt=s=>s?new Date(s).toLocaleString("en-GB",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
 function adminPanel(note){
   const M=AD;
@@ -682,15 +741,24 @@ function adminPanel(note){
         <span class="stat">آخر دخول: ${dt(c.last_used)} · ${c.uses} دخول · ${c.ai_today} عملية ذكاء اليوم</span>
       </div></div>`).join("")}
    </div><div class="bar" style="margin-top:8px"><button class="btn ghost sm" type="button" data-a="add">+ إضافة معلم</button><span class="stat">تعديل الاسم أو الرقم يُحفظ عند الخروج من الخانة.</span></div></div>
-   <div class="field"><label for="a-lim">الحد اليومي لعمليات الذكاء الاصطناعي لكل معلم (صورة أو بحث خارجي)</label>
+   <div class="field"><label for="a-lim">الحد اليومي لقراءة صور البلاكة لكل معلم</label>
      <div class="bar"><input id="a-lim" type="number" min="0" max="1000" value="${M.limit}" style="max-width:120px"><button class="btn ghost sm" type="button" data-a="limit">حفظ</button></div></div>
-   <div><h3 class="sec">موديلات مضافة من بحث خارجي (${M.extra.length})</h3>
-     <div class="codes">${M.extra.map(x=>`<div class="xrow" data-xid="${x.id}"><div><span class="mono" style="font-weight:600">${esc(x.model)}</span> <span class="stat">${esc(x.brand)} · ${esc(x.added_by||"")} · ${dt(x.created_at)}</span>${(x.sources||[]).length?`<div class="stat"><a href="${esc(x.sources[0].url)}" target="_blank" rel="noopener noreferrer">${esc((x.sources[0].title||x.sources[0].url).slice(0,70))}</a></div>`:""}</div>
-       <div class="bar"><button class="tog ${x.verified?"on":"off"}" type="button" data-a="xver">${x.verified?"موثّق":"غير موثّق"}</button><button class="btn ghost sm" type="button" data-a="xdel">${ADEL==="x"+x.id?"تأكيد الحذف":"حذف"}</button></div></div>`).join("")||'<div class="stat">لا يوجد بعد. عندما يبحث معلم عن موديل غير موجود ويُعثر عليه، يظهر هنا لتراجعه.</div>'}</div></div>
+   <div><h3 class="sec">تحديث الموديلات</h3>
+     <div class="bar"><button class="btn sm" type="button" data-a="mform">+ إضافة موديل</button>
+       <button class="btn ghost sm" type="button" data-a="xlsx">رفع ملف Excel</button>
+       <button class="btn ghost sm" type="button" data-a="tpl">تنزيل نموذج Excel</button>
+       <input id="a-file" type="file" accept=".xlsx,.xls,.csv" hidden></div>
+     <div class="stat" style="margin-top:6px">الموديل بنفس الاسم ونفس الشركة يُحدَّث بدل أن يتكرر. تظهر الإضافات عند المعلمين عند فتح المنصة.</div></div>
+   ${M.missing.length?`<div><h3 class="sec">موديلات صوّرها المعلمون ولم توجد (${M.missing.length})</h3><div class="codes">${M.missing.map(x=>`<div class="xrow" data-mid="${x.id}"><div><span class="mono" style="font-weight:600">${esc(x.model)}</span> <span class="stat">${esc(x.brand||"")} · ${esc(x.asked_by||"")} · ${x.times}× · ${dt(x.last_at)}</span>${x.plate&&(x.plate.refrigerant||x.plate.hp)?`<div class="stat">${esc([x.plate.refrigerant,x.plate.hp&&x.plate.hp+" HP",x.plate.voltage,x.plate.rla&&"RLA "+x.plate.rla].filter(Boolean).join(" · "))}</div>`:""}</div>
+       <div class="bar"><button class="btn sm" type="button" data-a="madd">إضافة</button><button class="btn ghost sm" type="button" data-a="mdel">تجاهل</button></div></div>`).join("")}</div></div>`:""}
+   <div><h3 class="sec">الموديلات المضافة (${M.extra.length})</h3>
+     <div class="codes">${M.extra.map(x=>`<div class="xrow" data-xid="${x.id}"><div><span class="mono" style="font-weight:600">${esc(x.model)}</span> <span class="stat">${esc(x.brand)} · ${x.origin==="admin"?"الإدارة":"بحث خارجي قديم"} · ${dt(x.created_at)}</span><div class="stat">${esc(specLine(x.spec))}</div></div>
+       <div class="bar"><button class="btn ghost sm" type="button" data-a="xedit">تعديل</button><button class="btn ghost sm" type="button" data-a="xdel">${ADEL==="x"+x.id?"تأكيد الحذف":"حذف"}</button></div></div>`).join("")||'<div class="stat">لا توجد إضافات بعد.</div>'}</div></div>
    <div class="field"><label for="a-np">تغيير كلمة سر الإدارة</label><div class="bar"><input id="a-np" type="password" autocomplete="new-password" style="flex:1"><button class="btn ghost sm" type="button" data-a="pass">تغيير</button></div></div>
    <div><h3 class="sec">آخر الدخولات</h3><div class="loglist">${M.log.map(l=>`<span>${esc(l.name)} · ${dt(l.at)}</span>`).join("")||"—"}</div></div>
   </div>`);
   const sh=$("#sheet");
+  $("#a-file").addEventListener("change",e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(f)importFile(f)});
   sh.querySelectorAll(".crow input").forEach(inp=>inp.addEventListener("change",()=>{
     const id=+inp.closest(".crow").dataset.id,v=inp.value.trim();
     if(inp.dataset.f==="name")adm("rename",{id,name:v},"تم حفظ الاسم.");else adm("setcode",{id,code:v},"تم تغيير الرقم السري. صاحبه القديم يُطرد خلال دقائق.");
@@ -706,7 +774,13 @@ function adminPanel(note){
     else if(a==="del"){if(ADEL===id){ADEL=null;adm("delete",{id},"تم حذف الرقم.")}else{ADEL=id;adminPanel()}}
     else if(a==="limit")adm("limit",{n:+$("#a-lim").value||0},"تم حفظ الحد اليومي.");
     else if(a==="pass"){const v=$("#a-np").value;if(v.length<6)return adminPanel({t:ADMERR.short,c:"bad"});const old=AP;try{const j=await rpc("cmp_admin",{p_pass:old,p_action:"adminpass",p_args:{new:v}});if(j.ok){AP=v;AD=j;adminPanel({t:"تم تغيير كلمة سر الإدارة.",c:"ok"})}else adminPanel({t:ADMERR[j.err]||"تعذّر التغيير.",c:"bad"})}catch(err){adminPanel({t:"تعذّر الاتصال بالخادم.",c:"bad"})}}
-    else if(a==="xver")adm("extra_verify",{id:xid},"تم تحديث حالة الموديل.");
+    else if(a==="mform")modelForm({});
+    else if(a==="xedit"){const x=M.extra.find(r=>r.id===xid);modelForm({brand:x.brand,model:x.model,...specToForm(x.spec)})}
+    else if(a==="madd"){const mid=+b.closest(".xrow").dataset.mid;const x=M.missing.find(r=>r.id===mid);const pl=x.plate||{};
+      modelForm({brand:x.brand||pl.brand||"",model:x.model,hp:pl.hp||"",ref:pl.refrigerant||"",app:String(pl.application||"").toUpperCase(),rla:pl.rla||"",volt:[pl.voltage,pl.hz&&pl.hz+"Hz"].filter(Boolean).join(" ")})}
+    else if(a==="mdel"){const mid=+b.closest(".xrow").dataset.mid;adm("missing_delete",{id:mid},"تم حذف الطلب.")}
+    else if(a==="xlsx")$("#a-file").click();
+    else if(a==="tpl")downloadTemplate();
     else if(a==="xdel"){if(ADEL==="x"+xid){ADEL=null;adm("extra_delete",{id:xid},"تم حذف الموديل.")}else{ADEL="x"+xid;adminPanel()}}
     else if(a==="copy"){
       const c=M.codes.find(x=>x.id===id);
