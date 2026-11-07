@@ -863,6 +863,7 @@ function subState(c){
   return{k:"on",t:`فعّال · باقي ${d} يوم`,cls:"ok"};
 }
 function subsHTML(M){
+  M.prices=M.prices||{month:"1",year:"10",whish:WH};M.requests=M.requests||[];M.codes=M.codes||[];
   const st=M.codes.map(c=>({c,s:subState(c)}));
   const n=k=>st.filter(x=>k==="all"||x.s.k===k||(k==="on"&&x.s.k==="soon")).length;
   const shown=st.filter(x=>SF==="all"||x.s.k===SF||(SF==="on"&&x.s.k==="soon"));
@@ -912,7 +913,7 @@ async function subCreate(args){
 }
 const dt=s=>s?new Date(s).toLocaleString("en-GB",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
 function adminPanel(note){
-  const M=AD;
+  const M=AD;M.extra=M.extra||[];M.missing=M.missing||[];M.log=M.log||[];
   setSheet(`<div class="adm">
    <div class="sheet-head"><h2 class="t">إدارة المنصة</h2><button class="x" type="button" data-close aria-label="إغلاق">×</button></div>
    ${note?`<div class="msg ${note.c}" style="white-space:pre-line">${esc(note.t)}</div>`:""}
