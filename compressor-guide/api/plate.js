@@ -22,10 +22,10 @@ Return ONLY a JSON object, no prose, with exactly these keys (use null when a va
 export default async function handler(req, res) {
   if (req.method !== "POST") return send(res, 405, { ok: false, err: "method" });
   try {
-    const { code, image } = req.body || {};
+    const { code, image, device } = req.body || {};
     if (typeof image !== "string" || !image.startsWith("data:image/") || image.length > 6_000_000)
       return send(res, 400, { ok: false, err: "image" });
-    const q = await rpc("cmp_ai", { p_code: code, p_kind: "plate" }, req);
+    const q = await rpc("cmp_ai", { p_code: code, p_kind: "plate", p_device: String(device || "") }, req);
     if (!q.ok) return send(res, 403, q);
     const out = await visionText(req, PROMPT, image, {
       model: "anthropic/claude-sonnet-5",
