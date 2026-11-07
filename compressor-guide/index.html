@@ -747,7 +747,7 @@ const ADMERR={bad:"كلمة السر غير صحيحة.",locked:"محاولات 
 function adminOpen(){
   setSheet(`<form class="adm" id="f-adm" autocomplete="off">
     <div class="sheet-head"><h2 class="t">إدارة المنصة</h2><button class="x" type="button" data-close aria-label="إغلاق">×</button></div>
-    <div class="field"><label for="a-pass">كلمة سر الإدارة</label><input id="a-pass" type="password" autocomplete="current-password"></div>
+    <div class="field"><label for="a-pass">كلمة سر الإدارة</label><input id="a-pass" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="current-password"></div>
     <div class="bar"><button class="btn" type="submit" id="a-go">فتح</button></div>
     <div class="msg bad" id="a-msg" hidden></div></form>`);
   $("#a-pass").focus();
@@ -954,7 +954,7 @@ function adminPanel(note){
    <div><h3 class="sec">الموديلات المضافة (${M.extra.length})</h3>
      <div class="codes">${M.extra.map(x=>`<div class="xrow" data-xid="${x.id}"><div><span class="mono" style="font-weight:600">${esc(x.model)}</span> <span class="stat">${esc(x.brand)} · ${x.origin==="admin"?"الإدارة":"بحث خارجي قديم"} · ${dt(x.created_at)}</span><div class="stat">${esc(specLine(x.spec))}</div></div>
        <div class="bar"><button class="btn ghost sm" type="button" data-a="xedit">تعديل</button><button class="btn ghost sm" type="button" data-a="xdel">${ADEL==="x"+x.id?"تأكيد الحذف":"حذف"}</button></div></div>`).join("")||'<div class="stat">لا توجد إضافات بعد.</div>'}</div></div>
-   <div class="field"><label for="a-np">تغيير كلمة سر الإدارة</label><div class="bar"><input id="a-np" type="password" autocomplete="new-password" style="flex:1"><button class="btn ghost sm" type="button" data-a="pass">تغيير</button></div></div>
+   <div class="field"><label for="a-np">تغيير كلمة سر الإدارة</label><div class="bar"><input id="a-np" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="new-password" style="flex:1"><button class="btn ghost sm" type="button" data-a="pass">تغيير</button></div></div>
    <div><h3 class="sec">آخر الدخولات</h3><div class="loglist">${M.log.map(l=>`<span>${esc(l.name)} · ${dt(l.at)}</span>`).join("")||"—"}</div></div>
   </div>`);
   const sh=$("#sheet");
