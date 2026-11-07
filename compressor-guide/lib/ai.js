@@ -40,7 +40,7 @@ export function send(res, status, obj) {
 }
 
 // ---------- AI providers ----------
-// Order: OpenAI (OPENAI_API_KEY) → Google Gemini (GEMINI_API_KEY) → Vercel AI Gateway.
+// Technician photo reading uses Gemini only; the admin web search uses OpenAI only (see api/*.js).
 // Every attempt has its own timeout and the whole chain stops before the function's time limit.
 const list = (v, d) => (v || d).split(",").map((s) => s.trim()).filter(Boolean);
 const OPENAI_MODELS = list(process.env.OPENAI_MODEL, "gpt-5-mini,gpt-4.1-mini");
@@ -140,28 +140,28 @@ async function chain(steps) {
 }
 
 // Read an image (data URL). Returns the model's text.
-export async function visionText(req, prompt, dataUrl, gatewayBody) {
+export async function visionText(req, prompt, dataUrl, gatewayBody, { providers = ["openai", "gemini"] } = {}) {
   const m = dataUrl.match(/^data:(image\/[\w.+-]+);base64,(.+)$/);
   if (!m) throw new Error("bad image");
   const steps = [];
-  if (process.env.OPENAI_API_KEY) steps.push(async (dl) => (await openai([{ role: "user", content: [
+  if (providers.includes("openai") && process.env.OPENAI_API_KEY) steps.push(async (dl) => (await openai([{ role: "user", content: [
     { type: "input_text", text: prompt }, { type: "input_image", image_url: dataUrl, detail: "high" }] }], { json: true }, dl)).text);
-  if (process.env.GEMINI_API_KEY) steps.push(async (dl) => partsText(await gemini({
+  if (providers.includes("gemini") && process.env.GEMINI_API_KEY) steps.push(async (dl) => partsText(await gemini({
     contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
     generationConfig: { temperature: 0, responseMimeType: "application/json" } }, dl, 30_000)));
-  if (!steps.length) steps.push(() => chat(req, gatewayBody));
+  if (!steps.length) throw new Error("ai_key: no AI key configured for " + providers.join("/"));
   return chain(steps);
 }
 
 // Answer with web search. Returns { text, sources: [{title,url}] }.
-export async function searchText(req, prompt, gatewayBody) {
+export async function searchText(req, prompt, gatewayBody, { providers = ["openai", "gemini"] } = {}) {
   const steps = [];
-  if (process.env.OPENAI_API_KEY) steps.push((dl) => openai(prompt, { search: true }, dl));
-  if (process.env.GEMINI_API_KEY) steps.push(async (dl) => {
+  if (providers.includes("openai") && process.env.OPENAI_API_KEY) steps.push((dl) => openai(prompt, { search: true }, dl));
+  if (providers.includes("gemini") && process.env.GEMINI_API_KEY) steps.push(async (dl) => {
     const j = await gemini({ contents: [{ role: "user", parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0 } }, dl, 45_000);
     const chunks = j.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     return { text: partsText(j), sources: chunks.map((c) => c.web).filter((w) => w && w.uri).map((w) => ({ title: w.title || w.uri, url: w.uri })) };
   });
-  if (!steps.length) steps.push(async () => ({ text: await chat(req, gatewayBody), sources: [] }));
+  if (!steps.length) throw new Error("ai_key: no AI key configured for " + providers.join("/"));
   return chain(steps);
 }

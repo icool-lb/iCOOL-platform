@@ -684,6 +684,34 @@ function modelForm(f){
     await adm("models_upsert",{rows:[{brand:v.brand,model:v.model,spec:buildSpec(v)}]},`تم حفظ الموديل ${v.model}.`);
   });
 }
+async function webLookup(model,brand,plate){
+  setSheet(`<div class="adm"><div class="sheet-head"><h2 class="t">بحث بالإنترنت</h2><button class="x" type="button" data-back aria-label="رجوع">→</button></div><div class="busy"><svg class="loader" aria-hidden="true"><use href="#g-split"/></svg>جارِ البحث عن <span class="mono">${esc(model)}</span>… قد يستغرق حتى دقيقة</div></div>`);
+  $("#sheet").onclick=e=>{if(e.target.closest("[data-back]"))adminPanel()};
+  const j=await api("api/admin-lookup",{pass:AP,model,brand,plate});
+  const head=`<div class="sheet-head"><h2 class="t">بحث بالإنترنت</h2><button class="x" type="button" data-back aria-label="رجوع">→</button></div>`;
+  if(!j.ok){const m=j.err==="ai_setup"?"مفتاح OpenAI غير مضاف في Vercel بعد (OPENAI_API_KEY).":j.err==="denied"?"كلمة سر الإدارة لم تعد صحيحة.":errTxt(j);
+    return setSheet(`<div class="adm">${head}<div class="msg bad">${esc(m)}</div><div class="bar"><button class="btn ghost" type="button" data-back>رجوع</button></div></div>`)}
+  const r=j.result||{},sp=r.spec||{};
+  const caps=(sp.capacities||[]).map(c=>`<tr><td>${tLbl(+c.evap_c)}</td><td class="num">${fmt(c.watts)}</td><td class="num">${fmt(c.watts*3.412)}</td><td>${esc(c.standard||"")}</td></tr>`).join("");
+  const conf={high:"عالية",medium:"متوسطة",low:"منخفضة"}[sp.confidence]||"";
+  setSheet(`<div class="adm">${head}
+    ${r.found?`<div><span class="mono" style="font-size:1.3rem;font-weight:600">${esc(r.model||model)}</span> <span class="stat">${esc(r.brand||brand||"")}</span></div>
+    <div class="msg ${sp.confidence==="high"?"ok":"info"}">وُجدت مواصفات${conf?` — درجة الثقة: ${conf}`:""}. راجعها مع المصادر قبل الحفظ.</div>
+    <div class="specs" style="margin:0">${spec("HP",sp.hp)}${spec("الفريون",sp.refrigerant)}${spec("التطبيق",sp.application)}${spec("النوع",sp.type)}${spec("الجهد",sp.voltage)}${spec("RLA",sp.rla,"A")}${spec("LRA",sp.lra,"A")}${spec("الإزاحة",sp.displacement_cc,"cc")}${spec("مكثف التشغيل",sp.run_cap_uf,"µF")}</div>
+    ${caps?`<div style="overflow-x:auto"><table class="caps-t"><thead><tr><th>درجة التبخير</th><th>W</th><th>BTU/h</th><th>المعيار</th></tr></thead><tbody>${caps}</tbody></table></div>`:'<div class="stat">لم تُذكر قدرة التبريد في المصادر.</div>'}
+    ${sp.notes_ar?`<div class="note" style="margin:0">${esc(sp.notes_ar)}</div>`:""}`
+    :`<div class="msg bad">لم توجد مواصفات موثوقة للموديل <span class="mono">${esc(model)}</span>.</div>${sp.notes_ar?`<div class="note" style="margin:0">${esc(sp.notes_ar)}</div>`:""}`}
+    ${srcList(r.sources)}
+    <div class="bar">${r.found?`<button class="btn" type="button" id="w-fill">تعبئة الفورم للمراجعة والحفظ</button>`:`<button class="btn" type="button" id="w-fill">إضافة يدوية</button>`}<button class="btn ghost" type="button" data-back>رجوع</button></div></div>`);
+  $("#w-fill").addEventListener("click",()=>{
+    const f={brand:r.brand||brand||"",model:r.model||model,...specToForm(sp)};
+    const ash=new Set((sp.capacities||[]).filter(c=>!c.standard||/ASHRAE/i.test(c.standard)).map(c=>grp(+c.evap_c)));
+    const odd=(sp.capacities||[]).filter(c=>c.standard&&!/ASHRAE/i.test(c.standard)&&!ash.has(grp(+c.evap_c)));
+    const src=(r.sources||[])[0];
+    f.notes=[f.notes,odd.length?`القدرة حسب ${odd[0].standard} عند ${odd.map(c=>c.evap_c+"°C").join(" / ")}`:"",src?`المصدر: ${src.url}`:""].filter(Boolean).join(" — ");
+    modelForm(f);
+  });
+}
 const TPL_HEAD=["الشركة Brand","الموديل Model","الحصان HP","الفريون Refrigerant","التطبيق Application","قدرة W عند -23.3 (LBP)","قدرة W عند -6.7 (MBP)","قدرة W عند +7.2 (HBP)","التيار RLA","الإزاحة cc","مكثف التشغيل µF","الجهد Voltage","ملاحظات Notes"];
 let xlsxP=null;
 function loadXLSX(){return xlsxP||(xlsxP=new Promise((ok,no)=>{const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";sc.onload=()=>ok(window.XLSX);sc.onerror=()=>{xlsxP=null;no(new Error("xlsx"))};document.head.appendChild(sc)}))}
@@ -748,9 +776,11 @@ function adminPanel(note){
        <button class="btn ghost sm" type="button" data-a="xlsx">رفع ملف Excel</button>
        <button class="btn ghost sm" type="button" data-a="tpl">تنزيل نموذج Excel</button>
        <input id="a-file" type="file" accept=".xlsx,.xls,.csv" hidden></div>
+     <form class="bar" id="a-web" style="margin-top:10px" autocomplete="off"><input type="text" id="a-wq" dir="ltr" placeholder="رقم الموديل" style="flex:2 1 140px"><input type="text" id="a-wb" dir="ltr" placeholder="الشركة (اختياري)" style="flex:1 1 110px"><button class="btn warn sm" type="submit">بحث بالإنترنت</button></form>
+     <div class="stat" style="margin-top:6px">البحث بالإنترنت للإدارة فقط (OpenAI): يعرض المواصفات ومصادرها لتراجعها، ولا يُحفظ شيء قبل أن تضغط «حفظ الموديل».</div>
      <div class="stat" style="margin-top:6px">الموديل بنفس الاسم ونفس الشركة يُحدَّث بدل أن يتكرر. تظهر الإضافات عند المعلمين عند فتح المنصة.</div></div>
    ${M.missing.length?`<div><h3 class="sec">موديلات صوّرها المعلمون ولم توجد (${M.missing.length})</h3><div class="codes">${M.missing.map(x=>`<div class="xrow" data-mid="${x.id}"><div><span class="mono" style="font-weight:600">${esc(x.model)}</span> <span class="stat">${esc(x.brand||"")} · ${esc(x.asked_by||"")} · ${x.times}× · ${dt(x.last_at)}</span>${x.plate&&(x.plate.refrigerant||x.plate.hp)?`<div class="stat">${esc([x.plate.refrigerant,x.plate.hp&&x.plate.hp+" HP",x.plate.voltage,x.plate.rla&&"RLA "+x.plate.rla].filter(Boolean).join(" · "))}</div>`:""}</div>
-       <div class="bar"><button class="btn sm" type="button" data-a="madd">إضافة</button><button class="btn ghost sm" type="button" data-a="mdel">تجاهل</button></div></div>`).join("")}</div></div>`:""}
+       <div class="bar"><button class="btn warn sm" type="button" data-a="mweb">بحث</button><button class="btn ghost sm" type="button" data-a="madd">إضافة يدوية</button><button class="btn ghost sm" type="button" data-a="mdel">تجاهل</button></div></div>`).join("")}</div></div>`:""}
    <div><h3 class="sec">الموديلات المضافة (${M.extra.length})</h3>
      <div class="codes">${M.extra.map(x=>`<div class="xrow" data-xid="${x.id}"><div><span class="mono" style="font-weight:600">${esc(x.model)}</span> <span class="stat">${esc(x.brand)} · ${x.origin==="admin"?"الإدارة":"بحث خارجي قديم"} · ${dt(x.created_at)}</span><div class="stat">${esc(specLine(x.spec))}</div></div>
        <div class="bar"><button class="btn ghost sm" type="button" data-a="xedit">تعديل</button><button class="btn ghost sm" type="button" data-a="xdel">${ADEL==="x"+x.id?"تأكيد الحذف":"حذف"}</button></div></div>`).join("")||'<div class="stat">لا توجد إضافات بعد.</div>'}</div></div>
@@ -758,6 +788,7 @@ function adminPanel(note){
    <div><h3 class="sec">آخر الدخولات</h3><div class="loglist">${M.log.map(l=>`<span>${esc(l.name)} · ${dt(l.at)}</span>`).join("")||"—"}</div></div>
   </div>`);
   const sh=$("#sheet");
+  $("#a-web").addEventListener("submit",e=>{e.preventDefault();const q=$("#a-wq").value.trim();if(norm(q).length<3)return $("#a-wq").focus();webLookup(q,$("#a-wb").value.trim(),null)});
   $("#a-file").addEventListener("change",e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(f)importFile(f)});
   sh.querySelectorAll(".crow input").forEach(inp=>inp.addEventListener("change",()=>{
     const id=+inp.closest(".crow").dataset.id,v=inp.value.trim();
@@ -778,6 +809,7 @@ function adminPanel(note){
     else if(a==="xedit"){const x=M.extra.find(r=>r.id===xid);modelForm({brand:x.brand,model:x.model,...specToForm(x.spec)})}
     else if(a==="madd"){const mid=+b.closest(".xrow").dataset.mid;const x=M.missing.find(r=>r.id===mid);const pl=x.plate||{};
       modelForm({brand:x.brand||pl.brand||"",model:x.model,hp:pl.hp||"",ref:pl.refrigerant||"",app:String(pl.application||"").toUpperCase(),rla:pl.rla||"",volt:[pl.voltage,pl.hz&&pl.hz+"Hz"].filter(Boolean).join(" ")})}
+    else if(a==="mweb"){const mid=+b.closest(".xrow").dataset.mid;const x=M.missing.find(r=>r.id===mid);webLookup(x.model,x.brand||(x.plate&&x.plate.brand)||"",x.plate)}
     else if(a==="mdel"){const mid=+b.closest(".xrow").dataset.mid;adm("missing_delete",{id:mid},"تم حذف الطلب.")}
     else if(a==="xlsx")$("#a-file").click();
     else if(a==="tpl")downloadTemplate();

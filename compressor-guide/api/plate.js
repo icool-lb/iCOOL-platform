@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: image } }] }],
       max_tokens: 900,
       temperature: 0,
-    });
+    }, { providers: ["gemini"] });
     const plate = parseJSON(out);
     if (!plate) return send(res, 502, { ok: false, err: "parse" });
     return send(res, 200, { ok: true, plate, left: q.left });
