@@ -19,6 +19,22 @@ Return ONLY a JSON object, no prose, with exactly these keys (use null when a va
  "legible": true or false (false if the photo is not a compressor nameplate or too blurry)
 }`;
 
+const PROMPT_APPLIANCE = `You are reading the rating label / nameplate of a home or commercial appliance (refrigerator, freezer, cold-room condensing unit, air conditioner indoor/outdoor unit, or washing machine) from a photo.
+Return ONLY a JSON object, no prose, with these keys (null when not printed or not legible; never guess):
+{
+ "device": "fridge | coldroom | ac | washer | null",
+ "brand": "manufacturer as printed",
+ "model": "the MODEL number exactly as printed",
+ "candidates": ["other codes that could be the model (type, product code, serial prefix), most likely first"],
+ "refrigerant": "e.g. R600a, R134a, R410A, R32",
+ "charge": "refrigerant charge as printed, e.g. 52 g or 0.9 kg",
+ "voltage": "as printed", "hz": "50 or 50/60", "phase": "1 or 3",
+ "rla": "rated amps", "lra": "locked rotor amps", "power": "rated power / input watts",
+ "capacity": "cooling capacity / kg capacity as printed",
+ "other": "any other useful printed info, short",
+ "legible": true or false
+}`;
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return send(res, 405, { ok: false, err: "method" });
   try {
@@ -27,7 +43,7 @@ export default async function handler(req, res) {
       return send(res, 400, { ok: false, err: "image" });
     const q = await rpc("cmp_ai", { p_code: code, p_kind: "plate", p_device: String(device || "") }, req);
     if (!q.ok) return send(res, 403, q);
-    const out = await visionText(req, PROMPT, image, {
+    const out = await visionText(req, req.body && req.body.kind === "appliance" ? PROMPT_APPLIANCE : PROMPT, image, {
       model: "anthropic/claude-sonnet-5",
       models: ["google/gemini-3.6-flash", "openai/gpt-6-astra"],
       messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: image } }] }],

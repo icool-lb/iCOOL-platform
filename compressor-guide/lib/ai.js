@@ -165,3 +165,25 @@ export async function searchText(req, prompt, gatewayBody, { providers = ["opena
   if (!steps.length) throw new Error("ai_key: no AI key configured for " + providers.join("/"));
   return chain(steps);
 }
+
+// ---------- OpenAI direct (diagnosis engine) ----------
+// input: Responses API input; opts: { search, json, perCallMs, budgetMs }
+export async function openaiRun(input, { search = false, json = false, perCallMs = 60_000, budgetMs = 80_000, effort = "low" } = {}) {
+  if (!process.env.OPENAI_API_KEY) throw new Error("ai_key: OPENAI_API_KEY missing");
+  const deadline = Date.now() + budgetMs;
+  const models = list(process.env.OPENAI_MODEL_DIAG || process.env.OPENAI_MODEL, "gpt-5-mini,gpt-4.1-mini");
+  try {
+    return await runModels("openai", models, deadline, perCallMs, async (model, ms) => {
+      const body = { model, input };
+      if (/^(gpt-5|o\d)/.test(model)) body.reasoning = { effort };
+      if (search) body.tools = [{ type: "web_search" }];
+      if (json && !search) body.text = { format: { type: "json_object" } };
+      const r = await call("https://api.openai.com/v1/responses", { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body, ms);
+      return r.ok ? { ok: true, value: openaiText(JSON.parse(r.text)) } : r;
+    });
+  } catch (e) {
+    if (e.kind === "key") throw new Error("ai_key: " + e.message);
+    if (e.kind === "busy") throw new Error("ai_busy: " + e.message);
+    throw e;
+  }
+}
