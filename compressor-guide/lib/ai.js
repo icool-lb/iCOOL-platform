@@ -40,24 +40,31 @@ export function send(res, status, obj) {
 }
 
 // ---------- Google Gemini (used when GEMINI_API_KEY is set in Vercel) ----------
-const GEMINI_MODELS = (process.env.GEMINI_MODEL || "gemini-flash-latest,gemini-2.5-flash").split(",").map((s) => s.trim()).filter(Boolean);
+const GEMINI_MODELS = (process.env.GEMINI_MODEL || "gemini-flash-latest,gemini-2.5-flash,gemini-flash-lite-latest,gemini-2.5-flash-lite")
+  .split(",").map((s) => s.trim()).filter(Boolean);
 export const useGemini = () => !!process.env.GEMINI_API_KEY;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Tries each model in turn; a busy model (429/500/503) gets one quick retry before moving on.
 async function gemini(body) {
-  let last;
+  let last, busy = false;
   for (const model of GEMINI_MODELS) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "x-goog-api-key": process.env.GEMINI_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const text = await r.text();
-    if (r.ok) return JSON.parse(text);
-    last = new Error(`gemini ${model} ${r.status}: ${text.slice(0, 300)}`);
-    if (r.status === 400 && /API key|API_KEY/i.test(text)) throw new Error("gemini_key: " + text.slice(0, 200));
-    if (r.status === 429) throw new Error("gemini_quota: " + text.slice(0, 200));
-    if (r.status !== 404) throw last; // only fall through to the next model when this one does not exist
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "x-goog-api-key": process.env.GEMINI_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const text = await r.text();
+      if (r.ok) return JSON.parse(text);
+      last = new Error(`gemini ${model} ${r.status}: ${text.slice(0, 300)}`);
+      console.warn(String(last.message).slice(0, 200));
+      if ((r.status === 400 || r.status === 403) && /API key|API_KEY|PERMISSION_DENIED/i.test(text)) throw new Error("gemini_key: " + text.slice(0, 200));
+      if ([429, 500, 503, 504].includes(r.status)) { busy = true; if (attempt === 0) { await wait(1200); continue; } }
+      break; // 404 or other: next model
+    }
   }
+  if (busy) throw new Error("gemini_quota: " + String(last && last.message).slice(0, 200));
   throw last;
 }
 const partsText = (j) => (j.candidates?.[0]?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || "").join("");
