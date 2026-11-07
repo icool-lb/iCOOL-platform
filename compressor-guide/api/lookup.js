@@ -1,6 +1,6 @@
 // Searches the web for a compressor model that is not in the platform, returns its specs with sources,
 // and adds it to the shared database (marked unverified until the admin confirms it).
-import { rpc, chat, parseJSON, send } from "../lib/ai.js";
+import { rpc, searchText, parseJSON, send } from "../lib/ai.js";
 
 function prompt(brand, model, plate) {
   return `Find the technical data of this refrigeration/AC compressor using web search.
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     if (m.replace(/[\s\-./_]/g, "").length < 3) return send(res, 400, { ok: false, err: "model" });
     const q = await rpc("cmp_ai", { p_code: code, p_kind: "lookup" }, req);
     if (!q.ok) return send(res, 403, q);
-    const out = await chat(req, {
+    const found = await searchText(req, prompt(b, m, plate), {
       model: "anthropic/claude-sonnet-5",
       models: ["openai/gpt-6-astra", "google/gemini-3.6-flash"],
       messages: [{ role: "user", content: prompt(b, m, plate) }],
@@ -55,14 +55,15 @@ export default async function handler(req, res) {
       max_tokens: 1800,
       temperature: 0,
     });
-    const r = parseJSON(out);
+    const r = parseJSON(found.text);
     if (!r) return send(res, 502, { ok: false, err: "parse" });
     const s = r.spec || {};
     const useful = r.found && (s.capacities?.length || s.hp || s.refrigerant || s.displacement_cc);
     let saved = null;
     if (useful) {
-      const sources = (Array.isArray(r.sources) ? r.sources : [])
-        .filter((x) => x && /^https?:\/\//.test(x.url || "")).slice(0, 6);
+      const named = (Array.isArray(r.sources) ? r.sources : []).filter((x) => x && /^https?:\/\//.test(x.url || ""));
+      const seen = new Set();
+      const sources = [...named, ...found.sources].filter((x) => !seen.has(x.url) && seen.add(x.url)).slice(0, 6);
       saved = await rpc("cmp_extra_add", {
         p_code: code,
         p_row: { brand: r.brand || b, model: r.model || m, spec: s, sources, origin: plate ? "plate+web" : "web" },
@@ -73,8 +74,9 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error("lookup", e);
     const msg = String(e.message || e);
-    if (/customer_verification_required|credit card|insufficient|quota|402/i.test(msg))
+    if (/customer_verification_required|credit card|insufficient|402|gemini_key/i.test(msg))
       return send(res, 503, { ok: false, err: "ai_setup" });
+    if (/gemini_quota/.test(msg)) return send(res, 429, { ok: false, err: "ai_busy" });
     return send(res, 500, { ok: false, err: "server", detail: msg.slice(0, 300) });
   }
 }
