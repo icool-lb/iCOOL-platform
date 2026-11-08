@@ -497,8 +497,12 @@ function accountHtml(name, b, at) {
   else h += "<tr><td>" + (b.days || 0) + " يوم" + (b.half ? " (منهم " + b.half + " نص نهار)" : "") + ' × ' + usd(b.daily) + '</td><td class="n">' + usd(b.wage || 0) + "</td></tr>";
   if (b.ot_hours) h += "<tr><td>إضافي " + fmtH(b.ot_hours) + '</td><td class="n">' + usd(b.ot_pay || 0) + "</td></tr>";
   if (b.allowance) h += '<tr><td>بدل بنزين</td><td class="n">' + usd(b.allowance) + "</td></tr>";
-  if (b.extra) h += '<tr><td>مدفوعات من جيبك</td><td class="n">' + usd(b.extra) + "</td></tr>";
-  h += '<tr><td>سلف ودفعات قبضتها</td><td class="n">−' + usd(b.adv_total || 0) + "</td></tr>";
+  if (b.pocket) h += '<tr><td>دفعتها من جيبك (بنزين ومشتريات)</td><td class="n">' + usd(b.pocket) + "</td></tr>";
+  if (b.extra) h += '<tr><td>مستحقات إضافية</td><td class="n">' + usd(b.extra) + "</td></tr>";
+  if (b.custody != null) {
+    h += '<tr><td>معاش مستحق (بعد الدفعات)</td><td class="n">' + usd(b.salary_owed || 0) + "</td></tr>";
+    h += '<tr><td>عهدة iCOOL معك</td><td class="n">−' + usd(b.custody) + "</td></tr>";
+  } else h += '<tr><td>سلف ودفعات قبضتها</td><td class="n">−' + usd(b.adv_total || 0) + "</td></tr>";
   h += '<tr><td><b>الباقي ' + (b.owed >= 0 ? "إلك" : "عليك") + '</b></td><td class="n"><b>' + usd(Math.abs(b.owed)) + "</b></td></tr></tbody></table></div>";
   if (b.advances && b.advances.length) {
     h += '<h2>السلف والدفعات</h2><div class="card"><table class="tbl"><thead><tr><th>التاريخ</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>' +
