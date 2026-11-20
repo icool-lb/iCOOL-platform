@@ -25,6 +25,92 @@ const OBS = {
   ac: [["refrigerant", "الفريون", "R410A"], ["voltage", "الجهد V", ""], ["amps", "الأمبير A", ""], ["suction_bar", "ضغط السحب bar", ""], ["return_air_c", "هواء راجع °C", ""], ["supply_air_c", "هواء خارج °C", ""], ["ambient_c", "الحرارة الخارجية °C", ""]],
   washer: [["voltage", "الجهد V", ""], ["water_pressure", "ضغط الماء", "ضعيف/جيد"], ["program", "البرنامج / المرحلة", ""], ["age_years", "عمر الجهاز (سنة)", ""]],
 };
+/* extra symptoms (merged into SYM) */
+Object.assign(SYM.fridge, { door_seal: "عازل الباب لا يسكّر", bad_smell: "رائحة", display_error: "كود / إنذار على الشاشة", ice_maker: "صانع الثلج / الماء", hot_sides: "جوانب البراد حامية جداً", freezer_warm: "الفريزر لا يجمّد", overcooling: "يجمّد في قسم البراد", oil_stain: "بقعة زيت على الأنابيب", after_power_cut: "توقف بعد انقطاع كهرباء" });
+Object.assign(SYM.coldroom, { oil_leak: "تسريب زيت", noise: "صوت غير طبيعي", trips_breaker: "يفصّل القاطع", fan_not_running: "مروحة المبخر لا تدور", condenser_fan: "مروحة المكثف لا تدور", hp_trip: "يفصل على HP", lp_trip: "يفصل على LP", frost_on_suction: "ثلج على خط السحب" });
+Object.assign(SYM.ac, { indoor_fan_not_running: "مروحة الداخلي لا تدور", outdoor_fan_not_running: "مروحة الخارجي لا تدور", stops_after_minutes: "يشتغل دقائق ويفصل", louver: "الريشة لا تتحرك", ice_on_pipes: "ثلج على الأنابيب", high_amps: "أمبير عالي", inverter_low_freq: "إنفرتر لا يرفع", oil_on_flare: "زيت على الفلير", after_install: "بعد تركيب جديد" });
+Object.assign(SYM.washer, { door_wont_lock: "الباب لا يقفل", detergent_left: "يبقى مسحوق بالدرج", clothes_wet: "الثياب تبقى مبلولة", drum_not_turning: "الحلة لا تدور", burning_smell: "رائحة حريق", trips_breaker: "تفصّل القاطع", display_dead: "الشاشة مطفية", foam: "رغوة زائدة" });
+const CAUSES = {
+  fridge: ["ريليه / PTC تالف", "أوفرلود تالف", "مكثف بدء / تشغيل", "ملفات الكمبروسير (قصر / فتح / أرضي)", "كمبروسير ضعيف (صمامات)", "نقص فريون / تسريب", "انسداد كابيليري", "رطوبة بالدارة / فلتر مسدود", "ترموستات تالف", "سخان الديفروست", "حساس ديفروست / بايمتال", "تايمر أو بورد الديفروست", "مروحة المبخر", "مروحة المكثف", "مكثف (condenser) متسخ", "عازل الباب", "بورد الإنفرتر", "جهد منخفض / مشكلة كهرباء", "حساس حرارة NTC", "Damper تالف"],
+  coldroom: ["نقص فريون / تسريب", "TXV / صمام التمدد", "فلتر مسدود", "مكثف متسخ / مروحة المكثف", "مروحة المبخر", "سخانات الديفروست", "كنترولر / حساس", "كونتاكتور", "حماية HP / LP", "كمبروسير ضعيف", "عزل / باب الغرفة", "حمل زائد / بضاعة ساخنة", "صولونويد", "زيت محبوس / عودة الزيت", "شحنة زائدة"],
+  ac: ["نقص فريون / تسريب", "مكثف الكمبروسير", "مكثف مروحة الخارجي", "فلتر / مبخر متسخ", "كونتاكتور", "بورد الداخلي", "بورد الخارجي / IPM", "حساس حرارة NTC", "كمبروسير", "صمام 4 اتجاه", "EEV / صمام إلكتروني", "تصريف مسدود", "كابل الاتصال", "جهد منخفض / كهرباء", "مكثف خارجي متسخ", "شحنة زائدة", "موتور المروحة"],
+  washer: ["مضخة التصريف", "فلتر المضخة مسدود", "صمام المياه", "حساس المستوى / بريسوستات", "قفل الباب", "فحمات الموتور", "الموتور / التاكو", "السير", "البيليات (رولمان) / الجوان", "السخان", "حساس NTC", "البورد", "خرطوم / جوان الباب", "اختلال توازن الحمولة", "الماصّات / السوست", "Hall sensor (Direct Drive)"],
+};
+const ONSET = ["فجأة", "تدريجياً خلال أيام", "بعد انقطاع / رجوع الكهرباء", "بعد تبديل اشتراك / مولد", "بعد تصليح سابق", "بعد نقل الجهاز", "بعد تركيب جديد", "بعد عاصفة / صاعقة", "متقطع (يجي ويروح)"];
+const CHECKS = {
+  fridge: ["قياس الجهد", "قياس الأمبير", "فحص ملفات الكمبروسير C-S-R", "فحص العزل (Megger)", "فحص الريليه / PTC", "فحص الأوفرلود", "فحص المكثف µF", "تركيب ساعة ضغط", "فحص التسريب", "فحص الترموستات", "فحص سخان الديفروست", "فحص حساس الديفروست", "فحص المراوح", "تنظيف المكثف"],
+  coldroom: ["قياس الجهد", "قياس الأمبير", "ساعات الضغط (سحب وطرد)", "Superheat", "Subcooling", "فحص الكنترولر وإعداداته", "فحص سخانات الديفروست", "فحص المراوح", "فحص الكونتاكتور", "فحص التسريب", "تنظيف المكثف", "فحص الصولونويد"],
+  ac: ["قياس الجهد", "قياس الأمبير", "ساعة الضغط", "فحص المكثفات µF", "فحص حساسات NTC", "تنظيف الفلاتر", "فحص التصريف", "فحص كابل الاتصال", "فحص التسريب", "قراءة كود العطل", "فحص مروحة الخارجي", "فحص الكونتاكتور"],
+  washer: ["قياس الجهد", "فحص فلتر المضخة", "فحص المضخة", "فحص صمام المياه", "فحص حساس المستوى", "فحص قفل الباب", "فحص الموتور / الفحمات", "فحص السخان", "فحص NTC", "وضع الاختبار (Test mode)", "فحص السير", "فحص البيليات"],
+};
+const REFS = ["R600a", "R134a", "R290", "R22", "R404A", "R410A", "R32", "R407C", "R448A", "R449A", "R507A", "R12 (قديم)"];
+const COLD_BRANDS = ["Copeland (Emerson)", "Danfoss / Maneurop", "Bitzer", "Tecumseh", "Embraco", "Secop", "Frascold", "Dorin", "L'Unite Hermetique", "Highly", "Kulthorn", "Refcomp", "Zanotti", "Daikin", "Mitsubishi", "Carrier"];
+const COLD_UNITS = ["Condensing unit — hermetic reciprocating", "Condensing unit — scroll", "Condensing unit — semi-hermetic", "Monoblock (Plug-in)", "Split system", "Rack / multi-compressor", "Inverter condensing unit"];
+const COLD_CTRL = ["Dixell XR (XR06/XR20/XR60…)", "Eliwell IC/ID (ID974, IC912…)", "Carel ir33 / easy", "Danfoss ERC / AK-CC", "Evco", "Pego", "Coolmate / TEC", "ميكانيكي (ترموستات + تايمر)"];
+
+/* ---------- searchable dropdown (combobox) ---------- */
+const CB = {};
+const normA = (s) => String(s || "").toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[\s\-_./()·,،]/g, "");
+// cfg: {id, label, items:[{v,l,s,g}], value (string|array), multi, free, ph, dir, onChange}
+function cbHTML(cfg) {
+  CB[cfg.id] = cfg;
+  if (cfg.multi && !Array.isArray(cfg.value)) cfg.value = cfg.value ? [cfg.value] : [];
+  const lab = (v) => { const it = cfg.items.find((x) => x.v === v); return it ? it.l : v; };
+  return `<div class="field cb${cfg.multi ? " multi" : ""}" data-cb="${cfg.id}">
+    ${cfg.label ? `<label for="cb-${cfg.id}">${cfg.label}</label>` : ""}
+    ${cfg.multi ? `<div class="cb-sel">${cfg.value.map((v) => `<span class="cb-tag">${esc(lab(v))}<button type="button" data-cb-rm="${esc(v)}" aria-label="إزالة">×</button></span>`).join("")}</div>` : ""}
+    <div class="cb-box"><input id="cb-${cfg.id}" class="cb-in" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="cbl-${cfg.id}" autocomplete="off"
+      ${cfg.dir ? `dir="${cfg.dir}"` : ""} value="${cfg.multi ? "" : esc(cfg.value ? lab(cfg.value) : "")}" placeholder="${esc(cfg.ph || "اكتب للبحث أو اختر…")}">
+      ${!cfg.multi && cfg.value ? `<button type="button" class="cb-x" aria-label="مسح">×</button>` : ""}<button type="button" class="cb-tg" tabindex="-1" aria-label="فتح القائمة">▾</button></div>
+    <ul class="cb-list" id="cbl-${cfg.id}" role="listbox" hidden></ul></div>`;
+}
+function cbBind(root) {
+  $$("[data-cb]", root).forEach((wrap) => {
+    const cfg = CB[wrap.dataset.cb]; if (!cfg) return;
+    const inp = $(".cb-in", wrap), list = $(".cb-list", wrap); let act = -1, shown = [];
+    const set = (v) => {
+      if (cfg.multi) { if (!cfg.value.includes(v)) cfg.value.push(v); inp.value = ""; drawSel(); }
+      else { cfg.value = v; const it = cfg.items.find((x) => x.v === v); inp.value = it ? it.l : v; close(); }
+      cfg.onChange && cfg.onChange(cfg.value, cfg);
+    };
+    const drawSel = () => { const s = $(".cb-sel", wrap); if (!s) return; const lab = (v) => (cfg.items.find((x) => x.v === v) || { l: v }).l;
+      s.innerHTML = cfg.value.map((v) => `<span class="cb-tag">${esc(lab(v))}<button type="button" data-cb-rm="${esc(v)}" aria-label="إزالة">×</button></span>`).join("");
+      $$("[data-cb-rm]", s).forEach((b) => b.addEventListener("click", () => { cfg.value = cfg.value.filter((x) => x !== b.dataset.cbRm); drawSel(); cfg.onChange && cfg.onChange(cfg.value, cfg); })); };
+    const close = () => { list.hidden = true; inp.setAttribute("aria-expanded", "false"); act = -1; };
+    const open = (all) => {
+      const q = all ? "" : normA(inp.value);
+      const toks = q ? [q] : [];
+      const sel = cfg.multi ? cfg.value : [];
+      shown = cfg.items.filter((x) => !sel.includes(x.v) && (!toks.length || toks.every((t) => normA(x.l + " " + (x.s || "") + " " + x.v + " " + (x.k || "")).includes(t)))).slice(0, 80);
+      const raw = inp.value.trim();
+      const exact = raw && cfg.items.some((x) => normA(x.l) === normA(raw) || normA(x.v) === normA(raw));
+      let html = "", g = null;
+      if (cfg.free && raw && !exact) html += `<li role="option" class="cb-opt free" data-i="-2"><b>استخدم: «${esc(raw)}»</b></li>`;
+      shown.forEach((x, i) => { if (x.g && x.g !== g) { g = x.g; html += `<li class="cb-g" role="presentation">${esc(g)}</li>`; }
+        html += `<li role="option" class="cb-opt" data-i="${i}" id="cbo-${cfg.id}-${i}"><span>${esc(x.l)}</span>${x.s ? `<small>${esc(x.s)}</small>` : ""}</li>`; });
+      if (!html) html = `<li class="cb-empty">${cfg.free ? "اكتب القيمة كما هي" : "لا نتائج"}</li>`;
+      list.innerHTML = html; list.hidden = false; inp.setAttribute("aria-expanded", "true"); act = -1;
+      $$(".cb-opt", list).forEach((li) => li.addEventListener("mousedown", (e) => { e.preventDefault(); pick(+li.dataset.i); }));
+    };
+    const pick = (i) => { if (i === -2) set(inp.value.trim()); else if (shown[i]) set(shown[i].v); if (cfg.multi) open(true); };
+    const mv = (d) => { const opts = $$(".cb-opt", list); if (!opts.length) return; act = (act + d + opts.length) % opts.length; opts.forEach((o, k) => o.classList.toggle("act", k === act)); opts[act].scrollIntoView({ block: "nearest" }); };
+    inp.addEventListener("focus", () => open(!cfg.multi && !!cfg.value));
+    inp.addEventListener("input", () => { if (!cfg.multi && cfg.free) { cfg.value = inp.value.trim(); cfg.onInput && cfg.onInput(cfg.value, cfg); } open(false); });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); list.hidden ? open(true) : mv(1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); mv(-1); }
+      else if (e.key === "Enter") { e.preventDefault(); const o = $$(".cb-opt", list)[act] || $$(".cb-opt:not(.free)", list)[0] || $$(".cb-opt", list)[0]; if (o) pick(+o.dataset.i); else if (cfg.free && inp.value.trim()) set(inp.value.trim()); }
+      else if (e.key === "Escape") close();
+      else if (e.key === "Backspace" && cfg.multi && !inp.value && cfg.value.length) { cfg.value.pop(); drawSel(); cfg.onChange && cfg.onChange(cfg.value, cfg); }
+    });
+    inp.addEventListener("blur", () => setTimeout(() => { close(); if (!cfg.multi && !cfg.free) { const it = cfg.items.find((x) => x.v === cfg.value); inp.value = it ? it.l : ""; } }, 120));
+    $(".cb-tg", wrap).addEventListener("click", () => { if (list.hidden) { inp.focus(); open(true); } else close(); });
+    const x = $(".cb-x", wrap); if (x) x.addEventListener("click", () => { cfg.value = ""; inp.value = ""; x.remove(); cfg.onChange && cfg.onChange("", cfg); inp.focus(); });
+    drawSel();
+  });
+}
+const cbVal = (id) => (CB[id] ? CB[id].value : "");
+
 const KIND = { procedure: "إجراء", troubleshooting: "تشخيص أعطال", installation: "تركيب", checklist: "قائمة فحص", reference: "مرجع" };
 const icon = (d) => ({
   fridge: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="4" width="24" height="40" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M12 18h24M17 10v4M17 24v8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
@@ -36,7 +122,7 @@ const icon = (d) => ({
 
 /* ---------- state ---------- */
 let KB = null, ready = false, TAB = "diag";
-const F = { device: "", brand: "", model: "", error_code: "", symptoms: new Set(), obs: {}, description: "", hypotheses: "", photo: null };
+const F = { device: "", brand: "", series: "", checks: [], hyps: [], model: "", error_code: "", symptoms: new Set(), obs: {}, description: "", hypotheses: "", photo: null };
 let CUR = null; // current case {id, result, research, archive, library, log, status}
 
 async function loadKB() {
@@ -61,7 +147,8 @@ function setTab(t) {
   TAB = t;
   $$(".svc-tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
   $("#cmp-ctrl").hidden = t !== "cmp"; $("#tab-cmp").hidden = t !== "cmp";
-  ["diag", "lib", "cases"].forEach((x) => { $("#tab-" + x).hidden = x !== t; });
+  ["diag", "lib", "cases", "acad"].forEach((x) => { const n = $("#tab-" + x); if (n) n.hidden = x !== t; });
+  if (t === "acad" && window.ACAD) window.ACAD.render();
   if (t === "lib") renderLib(); if (t === "cases") renderCases(); if (t === "diag" && !CUR) renderWizard();
   try { localStorage.setItem("icool_tab", t); } catch (e) {}
   window.scrollTo({ top: 0 });
@@ -79,34 +166,83 @@ function pipelineHTML(state = {}) {
     ${node("fb", "Feedback", "المنصة تتعلّم", "🧠")}
   </div>`;
 }
+function brandItems(d) {
+  if (d === "coldroom") return COLD_BRANDS.map((b) => ({ v: b, l: b, g: "كمبروسيرات / وحدات" }));
+  const cat = (KB && KB.brands || []).filter((x) => x.d === d);
+  const nf = (b) => (KB.families || []).filter((f) => f.d === d && f.b === b).length;
+  const seen = new Set(cat.map((x) => x.b));
+  const extra = [...new Set([...(KB.codes || []).filter((x) => x.d === d).map((x) => x.b), ...(KB.models || []).filter((x) => x.d === d).map((x) => x.b)])].filter((b) => !seen.has(b));
+  return [...cat.sort((x, z) => nf(z.b) - nf(x.b)).map((x) => ({ v: x.b, l: x.b, s: [x.country, nf(x.b) ? `${nf(x.b)} سلسلة` : ""].filter(Boolean).join(" · "), g: "الماركات في الكتالوج" })),
+    ...extra.sort().map((b) => ({ v: b, l: b, g: "ماركات أخرى" }))];
+}
+const famKey = (f) => `${f.b}|${f.series}`;
+function famOf(d, b, series) { return (KB && KB.families || []).find((f) => f.d === d && f.b === b && f.series === series); }
+function famMatch(d, b, model) {
+  const m = normA(model).toUpperCase(); if (m.length < 2) return null;
+  let best = null, bl = 0;
+  (KB.families || []).forEach((f) => { if (f.d !== d || (b && f.b.toLowerCase() !== b.toLowerCase())) return;
+    (f.prefixes || []).forEach((p) => { const q = normA(p).toUpperCase().replace(/\*/g, ""); if (q.length >= 2 && m.startsWith(q) && q.length > bl) { best = f; bl = q.length; } }); });
+  return best;
+}
+function familyCard(f) {
+  if (!f) return "";
+  const pill = (t) => t ? `<span class="pill">${esc(t)}</span>` : "";
+  return `<div class="fam-card"><div class="fam-h"><b>${esc(f.b)} · ${esc(f.series)}</b>${f.years ? `<span class="stat">${esc(f.years)}</span>` : ""}</div>
+    <div class="pills">${pill(f.type)}${pill(f.cap)}${f.inverter === true ? pill("Inverter") : f.inverter === false ? pill("On/Off") : ""}${pill(f.refrigerant)}${pill(f.compressor)}${pill(f.motor)}${(f.features || []).slice(0, 4).map(pill).join("")}</div>
+    ${(f.prefixes || []).length ? `<div class="stat">أرقام الموديل تبدأ بـ: <span dir="ltr" class="mono">${esc(f.prefixes.join(" · "))}</span></div>` : ""}
+    ${f.notes_ar ? `<p class="fam-note">🛠 ${esc(f.notes_ar)}</p>` : ""}
+    <div class="bar">${f.manual_url ? `<a class="btn ghost sm" href="${esc(f.manual_url)}" target="_blank" rel="noopener noreferrer">📘 ${esc(f.manual_title || "Manual")}</a>` : ""}${f.src ? `<a class="stat" href="${esc(f.src)}" target="_blank" rel="noopener noreferrer">المصدر ↗</a>` : ""}</div></div>`;
+}
 function renderWizard() {
   const el = $("#tab-diag"); const d = F.device;
-  const brands = d && KB ? [...new Set([...(KB.codes || []).filter((x) => x.d === d).map((x) => x.b), ...(KB.models || []).filter((x) => x.d === d).map((x) => x.b)])].sort() : [];
+  let sec2 = "";
+  if (d) {
+    const fams = (KB.families || []).filter((f) => f.d === d && (!F.brand || f.b.toLowerCase() === F.brand.toLowerCase()));
+    const famItems = fams.map((f) => ({ v: famKey(f), l: F.brand ? f.series : `${f.b} · ${f.series}`, s: [f.type, f.cap, f.refrigerant].filter(Boolean).join(" · "), k: (f.prefixes || []).join(" "), g: F.brand ? f.type : f.b }));
+    const codeItems = (KB.codes || []).filter((x) => x.d === d && (!F.brand || x.b.toLowerCase() === F.brand.toLowerCase())).map((x) => ({ v: String(x.c).split(/[\/,]/)[0].trim(), l: `${x.c}`, s: `${F.brand ? "" : x.b + " · "}${x.t}`, k: x.m || "", g: F.brand ? (x.f || "").slice(0, 40) : x.b }));
+    const bi = brandInfo(d, F.brand);
+    sec2 = `<fieldset class="wz-sec"><legend><span class="n">2</span>بيانات الجهاز</legend>
+      <div class="bar"><button class="btn sm" type="button" id="wz-plate">📷 صورة لوحة البيانات</button><span class="stat">تقرأ الشركة والموديل والفريون تلقائياً</span></div>
+      <div class="mgrid" style="margin-top:10px">
+        ${cbHTML({ id: "brand", label: d === "coldroom" ? "ماركة الكمبروسير / الوحدة" : "الشركة", items: brandItems(d), value: F.brand, free: true, dir: "ltr", ph: "LG, Samsung, Gree…", onChange: (v) => { readWizard(); F.brand = v; if (F.series && !famOf(d, v, F.series.split("|")[1])) F.series = ""; renderWizard(); setTimeout(() => { const n = $("#cb-series") || $("#wz-model"); n && n.focus(); }, 30); } })}
+        ${d === "coldroom" ? cbHTML({ id: "unit", label: "نوع الوحدة", items: COLD_UNITS.map((x) => ({ v: x, l: x })), value: F.obs.unit_type || "", free: true, dir: "ltr" }) + cbHTML({ id: "ctrl", label: "الكنترولر", items: COLD_CTRL.map((x) => ({ v: x, l: x })), value: F.obs.controller || "", free: true, dir: "ltr" })
+          : cbHTML({ id: "series", label: "السلسلة / عائلة الموديل", items: famItems, value: F.series, free: false, dir: "ltr", ph: fams.length ? `${fams.length} سلسلة — ابحث بالاسم أو بأول الموديل` : "اختر الشركة أولاً", onChange: (v) => { readWizard(); F.series = v; renderWizard(); } })}
+        <div class="field"><label for="wz-model">رقم الموديل (من اللوحة)</label><input id="wz-model" value="${esc(F.model)}" dir="ltr" placeholder="${d === "coldroom" ? "مثل ZB38KQE, FH4524Z" : "مثل F4V5RYP0W, AR12TXHQ"}" autocapitalize="characters"><div class="stat" id="wz-model-hit"></div></div>
+        ${cbHTML({ id: "err", label: "كود العطل على الشاشة (إن وُجد)", items: codeItems, value: F.error_code, free: true, dir: "ltr", ph: codeItems.length ? `${codeItems.length} كود — ابحث` : "E1, H6, 4E…", onChange: (v) => { F.error_code = v; codeHint(); }, onInput: () => codeHint() })}
+      </div><div id="wz-code-hit"></div>
+      <div id="wz-fam">${d !== "coldroom" && F.series ? familyCard(famOf(d, ...F.series.split("|"))) : ""}</div>
+      ${bi && !F.series ? `<div class="fam-card soft">${bi.decode_ar ? `<div class="stat">🔢 ${esc(bi.decode_ar)}</div>` : ""}${(bi.common_faults_ar || []).length ? `<div class="stat">أعطال شائعة لـ ${esc(bi.b)}: ${esc(bi.common_faults_ar.slice(0, 4).join(" · "))}</div>` : ""}${bi.support_url ? `<a class="stat" href="${esc(bi.support_url)}" target="_blank" rel="noopener noreferrer">دعم ${esc(bi.b)} الرسمي ↗</a>` : ""}</div>` : ""}
+    </fieldset>`;
+  }
+  const symItems = d ? Object.entries(SYM[d]).map(([k, v]) => ({ v: k, l: v })) : [];
+  const obsFields = d ? OBS[d].filter(([k]) => !["refrigerant", "water_pressure", "program", "age_years"].includes(k)) : [];
   el.innerHTML = `
-  <section class="svc-hero"><div><h2>تشخيص عطل بخبرة مهندس</h2><p>اكتب ما فحصته واحتمالاتك. مهندس الصيانة يطابقها مع الـ manual وإجراءات iCOOL وأرشيف الحالات المحلولة والإنترنت، ثم يعطيك خطوات تفاعلية بدرجة ثقة.</p></div>${pipelineHTML({ tech: "on" })}</section>
+  <section class="svc-hero"><div><h2>تشخيص عطل بخبرة مهندس</h2><p>اختر من القوائم أو ابحث فيها. مهندس الصيانة يطابق حالتك مع الـ manual ومواصفات الموديل وإجراءات iCOOL وأرشيف الحالات المحلولة والإنترنت، ثم يعطيك خطوات تفاعلية بدرجة ثقة.</p></div>${pipelineHTML({ tech: "on" })}</section>
   <form id="wz" class="wz" autocomplete="off">
     <fieldset class="wz-sec"><legend><span class="n">1</span>نوع الجهاز</legend>
       <div class="dev-grid">${Object.entries(DEVICES).map(([k, v]) => `<button type="button" class="dev ${v.tone}" data-dev="${k}" aria-pressed="${d === k}">${icon(k)}<b>${v.ar}</b><small>${v.sub}</small></button>`).join("")}</div>
     </fieldset>
-    ${d ? `
-    <fieldset class="wz-sec"><legend><span class="n">2</span>بيانات الجهاز</legend>
-      <div class="bar"><button class="btn sm" type="button" id="wz-plate">📷 صورة لوحة البيانات</button><span class="stat">تقرأ الشركة والموديل والفريون تلقائياً</span></div>
-      <div class="mgrid" style="margin-top:10px">
-        <div class="field"><label for="wz-brand">الشركة</label><input id="wz-brand" list="wz-brands" value="${esc(F.brand)}" dir="ltr" placeholder="LG, Samsung, Gree…"><datalist id="wz-brands">${brands.map((b) => `<option value="${esc(b)}">`).join("")}</datalist></div>
-        <div class="field"><label for="wz-model">الموديل</label><input id="wz-model" value="${esc(F.model)}" dir="ltr" placeholder="من لوحة البيانات"></div>
-        ${d === "ac" || d === "washer" || d === "fridge" || d === "coldroom" ? `<div class="field"><label for="wz-err">كود العطل (إن وُجد)</label><input id="wz-err" value="${esc(F.error_code)}" dir="ltr" placeholder="E1, H6, 4E…"></div>` : ""}
-      </div><div id="wz-code-hit"></div>
-    </fieldset>
+    ${d ? `${sec2}
     <fieldset class="wz-sec"><legend><span class="n">3</span>الأعراض</legend>
-      <div class="chips">${Object.entries(SYM[d]).map(([k, v]) => `<button type="button" class="chip" data-sym="${k}" aria-pressed="${F.symptoms.has(k)}">${v}</button>`).join("")}</div>
+      ${cbHTML({ id: "sym", items: symItems, value: [...F.symptoms], multi: true, ph: "ابحث عن عرض… (مثلاً: لا يبرد، كود، تسريب)", onChange: (v) => { F.symptoms = new Set(v); } })}
+      <div class="chips quick">${symItems.slice(0, 6).map((x) => `<button type="button" class="chip" data-qsym="${x.v}">${esc(x.l)}</button>`).join("")}</div>
+      <div class="mgrid" style="margin-top:6px">
+        ${cbHTML({ id: "onset", label: "متى بدأ العطل؟", items: ONSET.map((x) => ({ v: x, l: x })), value: F.obs.onset || "", free: true })}
+        ${d === "washer" ? cbHTML({ id: "program", label: "المرحلة التي يتوقف فيها", items: ["التعبئة", "الغسيل", "التسخين", "الشطف", "التصريف", "العصر", "بداية البرنامج", "نهاية البرنامج", "كل البرامج"].map((x) => ({ v: x, l: x })), value: F.obs.program || "", free: true }) : ""}
+        ${cbHTML({ id: "age", label: "عمر الجهاز", items: ["أقل من سنة (كفالة)", "1–3 سنوات", "3–7 سنوات", "7–12 سنة", "أكثر من 12 سنة"].map((x) => ({ v: x, l: x })), value: F.obs.age || "", free: true })}
+      </div>
     </fieldset>
     <fieldset class="wz-sec"><legend><span class="n">4</span>ما فحصته وقِسته <small class="stat">(كلما زادت القياسات ارتفعت الثقة)</small></legend>
-      <div class="mgrid">${OBS[d].map(([k, l, ph]) => `<div class="field"><label for="ob-${k}">${l}</label><input id="ob-${k}" data-ob="${k}" value="${esc(F.obs[k] || "")}" dir="ltr" placeholder="${esc(ph)}" ${k === "refrigerant" ? 'list="wz-refs"' : 'inputmode="decimal"'}></div>`).join("")}</div>
-      <datalist id="wz-refs">${["R600a", "R134a", "R290", "R22", "R404A", "R410A", "R32", "R407C", "R448A", "R449A", "R507A"].map((r) => `<option value="${r}">`).join("")}</datalist>
-      <div class="field" style="margin-top:10px"><label for="wz-desc">وصف المشكلة وما لاحظته</label><textarea id="wz-desc" rows="3" placeholder="متى بدأت؟ شو جرّبت؟ شو شفت؟">${esc(F.description)}</textarea></div>
+      ${cbHTML({ id: "checks", label: "الفحوصات التي قمت بها", items: CHECKS[d].map((x) => ({ v: x, l: x })), value: F.checks || [], multi: true, ph: "اختر ما فحصته…", onChange: (v) => { F.checks = v; } })}
+      <div class="mgrid">
+        ${d !== "washer" ? cbHTML({ id: "ref", label: "الفريون", items: REFS.map((x) => ({ v: x, l: x })), value: F.obs.refrigerant || "", free: true, dir: "ltr" }) : cbHTML({ id: "wp", label: "ضغط الماء", items: ["جيد", "ضعيف", "مقطوع", "خزان على السطح", "مضخة / ضغط عالي"].map((x) => ({ v: x, l: x })), value: F.obs.water_pressure || "", free: true })}
+        ${obsFields.map(([k, l, ph]) => `<div class="field"><label for="ob-${k}">${l}</label><input id="ob-${k}" data-ob="${k}" value="${esc(F.obs[k] || "")}" dir="ltr" placeholder="${esc(ph)}" inputmode="decimal"></div>`).join("")}
+      </div>
+      <div class="field" style="margin-top:10px"><label for="wz-desc">وصف إضافي (اختياري)</label><textarea id="wz-desc" rows="2" placeholder="أي تفصيل لم تجده في القوائم">${esc(F.description)}</textarea></div>
     </fieldset>
     <fieldset class="wz-sec hyp"><legend><span class="n">5</span>احتمالاتك كمعلّم</legend>
-      <textarea id="wz-hyp" rows="3" placeholder="برأيك شو العطل؟ اكتب احتمالاتك بالترتيب… مثال: ١) ريليه الكمبروسير ٢) نقص فريون">${esc(F.hypotheses)}</textarea>
+      ${cbHTML({ id: "hyps", items: CAUSES[d].map((x) => ({ v: x, l: x })), value: F.hyps || [], multi: true, free: true, ph: "اختر احتمالاتك بالترتيب أو اكتب احتمالاً آخر…", onChange: (v) => { F.hyps = v; } })}
+      <textarea id="wz-hyp" rows="2" placeholder="لماذا تعتقد ذلك؟ (اختياري)">${esc(F.hypotheses)}</textarea>
       <div class="stat">المهندس يراجع كل احتمال ويقول لك إذا كان صحيحاً ولماذا.</div>
       <div class="bar" style="margin-top:10px"><button class="btn ghost sm" type="button" id="wz-fault-photo">📎 صورة للعطل (اختياري)</button><span class="stat" id="wz-photo-st">${F.photo ? "✓ صورة مرفقة" : "مثل بورد محروق أو جليد على المبخر"}</span></div>
     </fieldset>
@@ -116,28 +252,46 @@ function renderWizard() {
   <input type="file" id="wz-file-plate" accept="image/*" hidden><input type="file" id="wz-file-fault" accept="image/*" hidden>`;
   bindWizard();
 }
+function brandInfo(d, b) { return b ? (KB.brands || []).find((x) => x.d === d && x.b.toLowerCase() === b.toLowerCase()) : null; }
 function readWizard() {
   const v = (id) => ($("#" + id) ? $("#" + id).value.trim() : "");
-  F.brand = v("wz-brand"); F.model = v("wz-model"); F.error_code = v("wz-err"); F.description = v("wz-desc"); F.hypotheses = v("wz-hyp");
-  $$("[data-ob]").forEach((i) => { F.obs[i.dataset.ob] = i.value.trim(); });
+  if (!$("#wz-model")) return;
+  F.brand = cbVal("brand") || ""; F.model = v("wz-model"); F.error_code = cbVal("err") || ""; F.description = v("wz-desc"); F.hypotheses = v("wz-hyp");
+  F.series = F.device === "coldroom" ? "" : (cbVal("series") || "");
+  F.symptoms = new Set(cbVal("sym") || []); F.checks = cbVal("checks") || []; F.hyps = cbVal("hyps") || [];
+  const o = F.obs; o.onset = cbVal("onset") || ""; o.age = cbVal("age") || "";
+  if (F.device === "washer") { o.water_pressure = cbVal("wp") || ""; o.program = cbVal("program") || ""; } else o.refrigerant = cbVal("ref") || "";
+  if (F.device === "coldroom") { o.unit_type = cbVal("unit") || ""; o.controller = cbVal("ctrl") || ""; }
+  $$("[data-ob]").forEach((i) => { o[i.dataset.ob] = i.value.trim(); });
 }
 function codeHint() {
   const box = $("#wz-code-hit"); if (!box || !KB) return;
   const n = (s) => String(s || "").toUpperCase().replace(/[\s\-./_]/g, "");
-  const e = n($("#wz-err") && $("#wz-err").value); const b = ($("#wz-brand") && $("#wz-brand").value || "").toLowerCase();
+  const e = n(cbVal("err")); const b = (cbVal("brand") || "").toLowerCase();
   if (e.length < 1) { box.innerHTML = ""; return; }
-  const hits = (KB.codes || []).filter((x) => x.d === F.device && n(x.c).split(/[\/,]/).some((p) => p === e)).sort((a, z) => (z.b.toLowerCase() === b) - (a.b.toLowerCase() === b)).slice(0, 3);
-  box.innerHTML = hits.length ? `<div class="code-hit">${hits.map((x) => `<div><b class="mono">${esc(x.b)} ${esc(x.c)}</b> — ${esc(x.t)}</div>`).join("")}<div class="stat">من أرشيف أكواد iCOOL. المهندس يتحقق منها حسب موديلك.</div></div>` : "";
+  const hits = (KB.codes || []).filter((x) => x.d === F.device && String(x.c).toUpperCase().split(/[\/,]/).some((p) => n(p) === e)).sort((a, z) => (z.b.toLowerCase() === b) - (a.b.toLowerCase() === b)).slice(0, 3);
+  box.innerHTML = hits.length ? `<div class="code-hit">${hits.map((x) => `<div><b class="mono">${esc(x.b)} ${esc(x.c)}</b> — ${esc(x.t)}${x.m ? `<div class="stat">${esc(x.m)}</div>` : ""}</div>`).join("")}<div class="stat">من أرشيف أكواد iCOOL. المهندس يتحقق منها حسب موديلك.</div></div>` : "";
+}
+function modelHint() {
+  const inp = $("#wz-model"), out = $("#wz-model-hit"); if (!inp || !out || F.device === "coldroom") return;
+  const f = famMatch(F.device, cbVal("brand"), inp.value);
+  if (!f) { out.textContent = ""; return; }
+  if (famKey(f) === cbVal("series")) { out.textContent = "✓ مطابق للسلسلة المختارة"; return; }
+  out.innerHTML = `<button type="button" class="linkbtn" id="wz-use-fam">يطابق ${esc(f.b)} · ${esc(f.series)} — اعتمد</button>`;
+  $("#wz-use-fam").addEventListener("click", () => { readWizard(); F.brand = f.b; F.series = famKey(f); renderWizard(); });
 }
 function bindWizard() {
-  $$("[data-dev]").forEach((b) => b.addEventListener("click", () => { readWizard(); if (F.device !== b.dataset.dev) { F.symptoms.clear(); F.obs = {}; } F.device = b.dataset.dev; renderWizard(); $("#wz .wz-sec:nth-of-type(2)") && $("#wz .wz-sec:nth-of-type(2)").scrollIntoView({ behavior: "smooth", block: "start" }); }));
-  $$("[data-sym]").forEach((b) => b.addEventListener("click", () => { const k = b.dataset.sym; F.symptoms.has(k) ? F.symptoms.delete(k) : F.symptoms.add(k); b.setAttribute("aria-pressed", String(F.symptoms.has(k))); }));
-  const err = $("#wz-err"); if (err) { err.addEventListener("input", codeHint); $("#wz-brand").addEventListener("change", codeHint); codeHint(); }
+  cbBind($("#tab-diag"));
+  $$("[data-dev]").forEach((b) => b.addEventListener("click", () => { readWizard(); if (F.device !== b.dataset.dev) { F.symptoms.clear(); F.obs = {}; F.checks = []; F.hyps = []; F.series = ""; F.brand = ""; F.error_code = ""; } F.device = b.dataset.dev; renderWizard(); $("#wz .wz-sec:nth-of-type(2)") && $("#wz .wz-sec:nth-of-type(2)").scrollIntoView({ behavior: "smooth", block: "start" }); }));
+  $$("[data-qsym]").forEach((b) => b.addEventListener("click", () => { readWizard(); F.symptoms.add(b.dataset.qsym); renderWizard(); }));
+  codeHint();
+  const mi = $("#wz-model"); if (mi) { mi.addEventListener("input", modelHint); modelHint(); }
   const pp = $("#wz-plate"); if (pp) pp.addEventListener("click", () => $("#wz-file-plate").click());
   const fp = $("#wz-fault-photo"); if (fp) fp.addEventListener("click", () => $("#wz-file-fault").click());
   $("#wz-file-plate").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) readPlate(f); });
   $("#wz-file-fault").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; try { F.photo = await I().shrink(f); $("#wz-photo-st").textContent = "✓ صورة مرفقة"; } catch (er) {} });
   const form = $("#wz"); form.addEventListener("submit", (e) => { e.preventDefault(); readWizard(); startCase(); });
+  form.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("cb-in")) e.preventDefault(); });
 }
 async function readPlate(file) {
   readWizard();
@@ -150,6 +304,7 @@ async function readPlate(file) {
     if (p.device && DEVICES[p.device] && !F.device) F.device = p.device;
     if (p.brand) F.brand = p.brand; if (p.model) F.model = p.model;
     if (p.refrigerant) F.obs.refrigerant = p.refrigerant;
+    if (F.device && F.model) { const fm = famMatch(F.device, F.brand, F.model); if (fm) { F.brand = fm.b; F.series = famKey(fm); } }
     if (p.voltage && !F.obs.voltage) F.obs.voltage = String(p.voltage).replace(/[^\d.]/g, "").slice(0, 5);
     const extra = [p.charge && `شحنة الفريون حسب اللوحة: ${p.charge}`, p.rla && `RLA: ${p.rla}`, p.lra && `LRA: ${p.lra}`, p.power && `القدرة: ${p.power}`, p.capacity && `السعة: ${p.capacity}`].filter(Boolean).join(" · ");
     if (extra && !F.description.includes(extra)) F.description = (F.description ? F.description + "\n" : "") + extra;
@@ -162,8 +317,13 @@ function flash(t, c) { const m = $("#wz-msg"); if (!m) return; m.textContent = t
 /* ---------- running a case ---------- */
 async function startCase() {
   if (!F.device) return flash(ERR.device, "bad");
-  if (!F.symptoms.size && !F.error_code && F.description.length < 8) return flash("اختر عرضاً واحداً على الأقل أو اكتب وصف المشكلة.", "bad");
-  const c = { device: F.device, brand: F.brand, model: F.model, error_code: F.error_code, symptoms: [...F.symptoms], observations: Object.fromEntries(Object.entries(F.obs).filter(([, v]) => v)), description: F.description, hypotheses: F.hypotheses };
+  if (!F.symptoms.size && !F.error_code && F.description.length < 8) return flash("اختر عرضاً واحداً على الأقل من قائمة الأعراض أو كود العطل.", "bad");
+  const fam = F.series ? famOf(F.device, ...F.series.split("|")) : null;
+  const obs = Object.fromEntries(Object.entries(F.obs).filter(([, v]) => v));
+  if (fam) { obs.series = `${fam.b} ${fam.series}`; obs.family_specs = [fam.type, fam.cap, fam.inverter === true ? "inverter" : fam.inverter === false ? "on/off" : "", fam.refrigerant, fam.compressor, fam.motor].filter(Boolean).join(" | "); if (fam.manual_url) obs.family_manual = fam.manual_url; if (fam.notes_ar) obs.family_note = fam.notes_ar; }
+  if ((F.checks || []).length) obs.checks_done = F.checks.join("، ");
+  const hyp = [(F.hyps || []).map((h, i) => `${i + 1}) ${h}`).join(" "), F.hypotheses].filter(Boolean).join(" — ");
+  const c = { device: F.device, brand: F.brand, model: F.model || (fam ? fam.series : ""), error_code: F.error_code, symptoms: [...F.symptoms], observations: obs, description: F.description, hypotheses: hyp };
   const el = $("#tab-diag");
   el.innerHTML = `<section class="run"><h2>جارِ تشخيص الحالة</h2>${pipelineHTML({ tech: "done", eng: "on" })}
     <div class="run-log" id="run-log"><div class="rl on" id="rl-open"><span class="dot"></span><div><b>المهندس يستلم الحالة ويبحث في أرشيف المنصة والمكتبة…</b></div></div></div></section>`;
@@ -243,7 +403,7 @@ function renderResult() {
     <div class="bar" style="margin-top:16px"><button class="btn ghost" type="button" id="new-case">+ حالة جديدة</button></div>
   </section>`;
   renderStepper(); renderFeedback();
-  $("#new-case").addEventListener("click", () => { CUR = null; F.device = ""; F.brand = F.model = F.error_code = F.description = F.hypotheses = ""; F.symptoms.clear(); F.obs = {}; renderWizard(); window.scrollTo({ top: 0 }); });
+  $("#new-case").addEventListener("click", () => { CUR = null; F.device = ""; F.brand = F.series = F.model = F.error_code = F.description = F.hypotheses = ""; F.symptoms.clear(); F.obs = {}; F.checks = []; F.hyps = []; renderWizard(); window.scrollTo({ top: 0 }); });
   $$("[data-guide]", el).forEach((b) => b.addEventListener("click", () => openGuide(b.dataset.guide)));
 }
 function checklist(k, items) {
@@ -252,9 +412,9 @@ function checklist(k, items) {
 /* stepper shared by cases and library guides: steps use either {title,action,measure{label,unit,min,max},expected,if_fail} or *_ar fields */
 function stepView(s) {
   return { title: s.title || s.title_ar || "", action: s.action || s.action_ar || "", expected: s.expected || s.expected_ar || "", fail: s.if_fail || s.if_fail_ar || "",
-    warn: s.warning_ar || "", tip: s.tip_ar || "", m: s.measure ? { label: s.measure.label || s.measure.label_ar || "", unit: s.measure.unit || "", min: s.measure.min, max: s.measure.max } : null };
+    warn: s.warning_ar || s.warning || "", tip: s.tip_ar || s.tip || "", m: s.measure ? { label: s.measure.label || s.measure.label_ar || "", unit: s.measure.unit || "", min: s.measure.min, max: s.measure.max } : null };
 }
-function makeStepper(host, steps, logArr, onLog) {
+function makeStepper(host, steps, logArr, onLog, opts = {}) {
   let i = Math.min(logArr.length, steps.length - 1); if (i < 0) i = 0;
   const draw = () => {
     const s = stepView(steps[i]), lg = logArr[i] || {};
@@ -264,10 +424,10 @@ function makeStepper(host, steps, logArr, onLog) {
       <div class="st-card"><div class="stat">خطوة ${i + 1} من ${steps.length}</div><h4>${esc(s.title)}</h4><p>${esc(s.action)}</p>
         ${s.warn ? `<div class="msg bad">⚠️ ${esc(s.warn)}</div>` : ""}
         ${s.m ? `<div class="st-measure"><label for="st-val">${esc(s.m.label)} ${range ? `<span class="stat">(السليم: <span dir="ltr">${range}</span>)</span>` : ""}</label><div class="bar"><input id="st-val" inputmode="decimal" dir="ltr" value="${esc(lg.v || "")}" placeholder="القيمة المقاسة"><span class="stat">${esc(s.m.unit)}</span><span id="st-eval"></span></div></div>` : ""}
-        <div class="st-exp"><b>النتيجة السليمة:</b> ${esc(s.expected)}</div>
+        ${s.expected ? `<div class="st-exp"><b>النتيجة السليمة:</b> ${esc(s.expected)}</div>` : ""}
         <div class="st-fail" ${lg.r === "fail" ? "" : "hidden"}><b>إذا لم تكن سليمة:</b> ${esc(s.fail)}</div>
         ${s.tip ? `<div class="stat">💡 ${esc(s.tip)}</div>` : ""}
-        <div class="bar st-act"><button class="btn sm st-ok" type="button" data-r="ok">✓ سليمة</button><button class="btn sm st-bad" type="button" data-r="fail">✗ غير سليمة</button><button class="btn ghost sm" type="button" data-r="skip">تخطي</button>
+        <div class="bar st-act"><button class="btn sm st-ok" type="button" data-r="ok">${opts.learn ? "✓ فهمت / نفّذت" : "✓ سليمة"}</button>${opts.learn ? "" : `<button class="btn sm st-bad" type="button" data-r="fail">✗ غير سليمة</button>`}<button class="btn ghost sm" type="button" data-r="skip">تخطي</button>
           <span class="sp"></span>${i > 0 ? `<button class="btn ghost sm" type="button" data-nav="-1">السابق</button>` : ""}${i < steps.length - 1 ? `<button class="btn ghost sm" type="button" data-nav="1">التالي</button>` : ""}</div>
       </div></div>`;
     const inp = $("#st-val", host);
@@ -285,7 +445,7 @@ function makeStepper(host, steps, logArr, onLog) {
         $("#st-found", host).addEventListener("click", () => { const fb = $("#fb-box"); if (fb) { fb.scrollIntoView({ behavior: "smooth" }); const sel = $("#fb-cause"); if (sel && stepView(steps[i]).fail) { const o = [...sel.options].find((x) => x.value === "__other"); $("#fb-other").value = stepView(steps[i]).fail.slice(0, 200); sel.value = "__other"; $("#fb-other").hidden = false; } } });
         const ct = $("#st-cont", host); if (ct) ct.addEventListener("click", () => { i++; draw(); });
         return; }
-      if (i < steps.length - 1) { i++; draw(); } else { draw(); const d = document.createElement("div"); d.className = "msg ok"; d.style.marginTop = "8px"; d.textContent = "انتهت الخطوات. سجّل نتيجة التصليح بالأسفل لتتعلّم المنصة."; $(".st-card", host).appendChild(d); }
+      if (i < steps.length - 1) { i++; draw(); } else { draw(); const d = document.createElement("div"); d.className = "msg ok"; d.style.marginTop = "8px"; d.textContent = opts.learn ? "أنهيت خطوات الدرس ✓ انتقل إلى الاختبار بالأسفل." : "انتهت الخطوات. سجّل نتيجة التصليح بالأسفل لتتعلّم المنصة."; $(".st-card", host).appendChild(d); }
     }));
   };
   draw();
@@ -351,12 +511,12 @@ async function openCase(id) {
 let LIBF = { dev: "", q: "", sec: "guides" };
 function renderLib() {
   const el = $("#tab-lib"); if (!KB) { el.innerHTML = '<div class="busy">جارِ التحميل…</div>'; loadKB().then(renderLib); return; }
-  const secs = [["guides", "الإجراءات والأدلة"], ["pt", "الفريون والضغوط"], ["codes", "أكواد الأعطال"], ["manuals", "الكتيبات Manuals"]];
+  const secs = [["guides", "الإجراءات والأدلة"], ["models", "الموديلات والمواصفات"], ["pt", "الفريون والضغوط"], ["codes", "أكواد الأعطال"], ["manuals", "الكتيبات Manuals"]];
   el.innerHTML = `<h2 class="tab-h">مكتبة iCOOL الفنية</h2>
    <div class="seg">${secs.map(([k, t]) => `<button type="button" class="seg-b" data-sec="${k}" aria-pressed="${LIBF.sec === k}">${t}</button>`).join("")}</div>
    <div id="lib-body"></div>`;
   $$("[data-sec]", el).forEach((b) => b.addEventListener("click", () => { LIBF.sec = b.dataset.sec; renderLib(); }));
-  ({ guides: libGuides, pt: libPT, codes: libCodes, manuals: libManuals })[LIBF.sec]();
+  ({ guides: libGuides, models: libModels, pt: libPT, codes: libCodes, manuals: libManuals })[LIBF.sec || "guides"]();
 }
 function devChips() {
   return `<div class="chips" style="margin-bottom:10px"><button type="button" class="chip" data-ldev="" aria-pressed="${!LIBF.dev}">الكل</button>${Object.entries(DEVICES).map(([k, v]) => `<button type="button" class="chip" data-ldev="${k}" aria-pressed="${LIBF.dev === k}">${v.ar}</button>`).join("")}<button type="button" class="chip" data-ldev="general" aria-pressed="${LIBF.dev === "general"}">عام</button></div>`;
@@ -422,16 +582,32 @@ function libPT() {
 }
 function libCodes() {
   const body = $("#lib-body"); const n = (s) => String(s || "").toUpperCase().replace(/[\s\-./_]/g, ""); const q = n(LIBF.q);
-  const dev = LIBF.dev === "ac" || LIBF.dev === "washer" ? LIBF.dev : "";
+  const dev = ["ac", "washer", "fridge"].includes(LIBF.dev) ? LIBF.dev : "";
   const list = (KB.codes || []).filter((x) => (!dev || x.d === dev) && (!q || n(x.c).includes(q) || n(x.b).includes(q) || n(x.t).includes(q))).slice(0, 80);
-  body.innerHTML = `<div class="chips" style="margin-bottom:10px"><button type="button" class="chip" data-cdev="" aria-pressed="${!dev}">الكل</button><button type="button" class="chip" data-cdev="ac" aria-pressed="${dev === "ac"}">مكيفات</button><button type="button" class="chip" data-cdev="washer" aria-pressed="${dev === "washer"}">غسالات</button></div>
+  body.innerHTML = `<div class="chips" style="margin-bottom:10px"><button type="button" class="chip" data-cdev="" aria-pressed="${!dev}">الكل</button><button type="button" class="chip" data-cdev="fridge" aria-pressed="${dev === "fridge"}">برادات</button><button type="button" class="chip" data-cdev="ac" aria-pressed="${dev === "ac"}">مكيفات</button><button type="button" class="chip" data-cdev="washer" aria-pressed="${dev === "washer"}">غسالات</button></div>
    <input id="lib-q" class="lib-q" type="search" placeholder="الكود أو الشركة… مثال: E1، H6، Gree" value="${esc(LIBF.q)}" dir="ltr">
    <div class="list">${list.map((x, k) => `<details class="codebox"><summary><b class="mono">${esc(x.c)}</b> <span class="stat">${esc(x.b)}${x.f ? " · " + esc(String(x.f).slice(0, 60)) : ""}</span><br>${esc(x.t)}</summary>
      ${x.m ? `<p class="stat">${esc(x.m)}</p>` : ""}${(x.causes || []).length ? `<b>الأسباب المحتملة</b><ul class="ev">${x.causes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}${(x.checks || []).length ? `<b>الفحوصات</b><ol class="ev">${x.checks.map((c) => `<li>${esc(c)}</li>`).join("")}</ol>` : ""}${(x.parts || []).length ? `<div class="bar">${x.parts.map((p) => `<span class="pill">${esc(p)}</span>`).join("")}</div>` : ""}${x.src ? `<div><a href="${esc(x.src)}" target="_blank" rel="noopener noreferrer">المصدر</a></div>` : ""}
      <button class="btn sm" type="button" data-diag-code="${k}" style="margin-top:8px">شخّص هذا العطل</button></details>`).join("") || '<div class="stat">لا توجد نتائج.</div>'}</div>`;
   $$("[data-cdev]", body).forEach((b) => b.addEventListener("click", () => { LIBF.dev = b.dataset.cdev; libCodes(); }));
   const qi = $("#lib-q"); qi.addEventListener("input", () => { LIBF.q = qi.value; const pos = qi.selectionStart; libCodes(); const nn = $("#lib-q"); nn.focus(); nn.setSelectionRange(pos, pos); });
-  $$("[data-diag-code]", body).forEach((b) => b.addEventListener("click", () => { const x = list[+b.dataset.diagCode]; CUR = null; F.device = x.d; F.brand = x.b; F.error_code = String(x.c).split(/[\/,]/)[0].trim(); F.symptoms = new Set(["error_code"].filter((k) => SYM[x.d][k])); setTab("diag"); }));
+  $$("[data-diag-code]", body).forEach((b) => b.addEventListener("click", () => { const x = list[+b.dataset.diagCode]; CUR = null; F.device = x.d; F.brand = x.b; F.series = ""; F.error_code = String(x.c).split(/[\/,]/)[0].trim(); F.symptoms = new Set(["error_code"].filter((k) => SYM[x.d][k])); setTab("diag"); }));
+}
+function libModels() {
+  const body = $("#lib-body"); const dev = ["fridge", "ac", "washer"].includes(LIBF.dev) ? LIBF.dev : "fridge"; LIBF.dev = dev;
+  const q = normA(LIBF.mq || ""), b = LIBF.mb || "";
+  const all = (KB.families || []).filter((f) => f.d === dev);
+  const list = all.filter((f) => (!b || f.b === b) && (!q || normA([f.b, f.series, (f.prefixes || []).join(" "), f.type, f.refrigerant, f.compressor, f.motor].join(" ")).includes(q)));
+  const brands = [...new Set(all.map((f) => f.b))].sort();
+  body.innerHTML = `<div class="chips" style="margin-bottom:10px">${["fridge", "ac", "washer"].map((k) => `<button type="button" class="chip" data-mdev="${k}" aria-pressed="${dev === k}">${DEVICES[k].ar}</button>`).join("")}</div>
+   <div class="mgrid">${cbHTML({ id: "lmb", label: "الشركة", items: [{ v: "", l: "كل الشركات" }, ...brands.map((x) => ({ v: x, l: x, s: `${all.filter((f) => f.b === x).length} سلسلة` }))], value: b, dir: "ltr", onChange: (v) => { LIBF.mb = v; libModels(); } })}
+   <div class="field"><label for="lib-mq">بحث</label><input id="lib-mq" class="lib-q" type="search" placeholder="السلسلة أو أول رقم الموديل أو الفريون…" value="${esc(LIBF.mq || "")}" dir="ltr"></div></div>
+   <div class="stat" style="margin:6px 0">${list.length} سلسلة · مصدر كل سلسلة ورابط الـ manual داخل البطاقة</div>
+   <div class="list">${list.slice(0, 60).map((f, k) => `<div>${familyCard(f)}<button class="btn sm" type="button" data-diag-fam="${k}" style="margin:-4px 0 10px">شخّص عطل لهذا الموديل</button></div>`).join("") || '<div class="stat">لا توجد نتائج.</div>'}</div>`;
+  cbBind(body);
+  $$("[data-mdev]", body).forEach((x) => x.addEventListener("click", () => { LIBF.dev = x.dataset.mdev; LIBF.mb = ""; libModels(); }));
+  const qi = $("#lib-mq"); qi.addEventListener("input", () => { LIBF.mq = qi.value; const pos = qi.selectionStart; libModels(); const nn = $("#lib-mq"); nn.focus(); nn.setSelectionRange(pos, pos); });
+  $$("[data-diag-fam]", body).forEach((x) => x.addEventListener("click", () => { const f = list[+x.dataset.diagFam]; CUR = null; F.device = f.d; F.brand = f.b; F.series = famKey(f); F.error_code = ""; F.symptoms = new Set(); F.obs = f.refrigerant ? { refrigerant: f.refrigerant } : {}; setTab("diag"); }));
 }
 async function libManuals() {
   const body = $("#lib-body");
@@ -475,8 +651,8 @@ async function init() {
   $$(".svc-tab").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
   await loadKB();
   let t = "diag"; try { t = localStorage.getItem("icool_tab") || "diag"; } catch (e) {}
-  setTab(["diag", "lib", "cmp", "cases"].includes(t) ? t : "diag");
+  setTab(["diag", "lib", "cmp", "cases", "acad"].includes(t) ? t : "diag");
 }
-window.SVC = { init, adminCases, openGuide };
+window.SVC = { init, adminCases, openGuide, setTab, makeStepper, loadKB, cbHTML, cbBind, esc, icon, DEVICES, get KB() { return KB; } };
 if (window.ICOOL && window.ICOOL.loggedIn) init(); else document.addEventListener("icool:login", init);
 })();

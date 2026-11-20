@@ -288,6 +288,7 @@ header.top::after{content:"";position:absolute;inset:auto 0 -1px;height:3px;back
       <nav class="svc-tabs" role="tablist" aria-label="أقسام المنصة">
         <button class="svc-tab" role="tab" type="button" data-tab="diag" aria-selected="true">🔧 تشخيص عطل</button>
         <button class="svc-tab" role="tab" type="button" data-tab="lib" aria-selected="false">📚 المكتبة</button>
+        <button class="svc-tab" role="tab" type="button" data-tab="acad" aria-selected="false">🎓 الأكاديمية</button>
         <button class="svc-tab" role="tab" type="button" data-tab="cmp" aria-selected="false">🧊 الكباسات</button>
         <button class="svc-tab" role="tab" type="button" data-tab="cases" aria-selected="false">🗂 حالاتي</button>
       </nav>
@@ -324,6 +325,7 @@ header.top::after{content:"";position:absolute;inset:auto 0 -1px;height:3px;back
    <section id="tab-diag" class="svc-sec"></section>
    <section id="tab-lib" class="svc-sec" hidden></section>
    <section id="tab-cases" class="svc-sec" hidden></section>
+   <section id="tab-acad" class="svc-sec" hidden></section>
    <div id="tab-cmp" hidden>
     <div class="meta-line"><span id="res-line"></span><span>اضغط على أي موديل لعرض كامل المواصفات والبدائل</span></div>
     <div class="list" id="list"></div>
@@ -1005,5 +1007,6 @@ function adminPanel(note){
 })();
 </script>
 <script src="svc.js"></script>
+<script src="acad.js"></script>
 </body>
 </html>
