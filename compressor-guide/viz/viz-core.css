@@ -1,0 +1,6 @@
+/* shared ACV styles (per-group styles live in viz-*.css and are concatenated at build) */
+.acv{margin:12px 0;position:relative}
+.acv svg{display:block;width:100%;height:auto;max-height:70vh;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.acv-cap{font-size:.84rem;color:var(--muted);margin-top:6px;text-align:center}
+.acv button,.acv li,.acv p{unicode-bidi:plaintext}
+.acv button>span,.acv li>span,.acv button>b{unicode-bidi:plaintext}

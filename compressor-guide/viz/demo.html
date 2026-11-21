@@ -1,0 +1,29 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ACV demo</title>
+<style>
+:root{--blue:#0066A7;--blue-ink:#fff;--blue-soft:#e3f0fa;--orange:#F1471E;--orange-soft:#fde7e1;--ink:#0D2132;--muted:#566A7C;--bg:#f2f5f9;--surface:#fff;--sunk:#eef2f6;--line:#d9e1ea;--ok:#1f8f4e;--ok-soft:#e1f4e8;--bad:#c2331b;--bad-soft:#fbe4df;--warn:#b26b00;--warn-soft:#fff1d6;--r:10px;--f-body:system-ui,"Segoe UI",Tahoma,sans-serif;--f-display:var(--f-body);--f-mono:ui-monospace,monospace}
+:root[data-theme=dark]{--blue:#3d9be0;--blue-soft:#13314a;--orange:#ff6a45;--orange-soft:#3a1d16;--ink:#e7eef5;--muted:#9fb2c4;--bg:#0b1722;--surface:#12212f;--sunk:#0e1b27;--line:#25384a;--ok:#4cc27e;--ok-soft:#143022;--bad:#ff7a63;--bad-soft:#3a1a14;--warn:#f0b04a;--warn-soft:#33260f}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);padding:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 auto 18px;max-width:720px}
+h3{margin:0 0 8px;font-size:1rem}
+button{font:inherit;cursor:pointer}
+</style>
+<link rel="stylesheet" href="viz.css">
+</head><body>
+<div id="out"></div>
+<script src="core.js"></script>
+<script>
+// widget files to load (?f=scenes,sims,ex) ; ?only=name ; ?theme=dark
+const q=new URLSearchParams(location.search);
+if(q.get('theme')==='dark')document.documentElement.dataset.theme='dark';
+const files=(q.get('f')||'scenes,sims,ex').split(',');
+let n=0;files.forEach(f=>{const s=document.createElement('script');s.src=f+'.js';s.onload=s.onerror=()=>{if(++n===files.length)go()};document.head.appendChild(s)});
+async function go(){
+  let kb=null;try{kb={ptables:await (await fetch('../ptables.demo.json').catch(()=>null)).json()}}catch(e){}
+  const out=document.getElementById('out');const only=q.get('only');
+  for(const [name,def] of Object.entries(ACV.W)){ if(only&&only!==name)continue;
+    (def.demo||[{}]).forEach((p,i)=>{const c=document.createElement('div');c.className='card';c.innerHTML=`<h3>${name} #${i+1}</h3><div class="host"></div>`;out.appendChild(c);
+      ACV.render(c.querySelector('.host'),{w:name,p},{kb});});}
+  document.body.dataset.ready='1';
+}
+</script></body></html>

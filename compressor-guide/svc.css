@@ -233,3 +233,33 @@ textarea{font:inherit;color:inherit;width:100%;padding:10px 12px;border:1.5px so
 .cert-verify{position:fixed;inset:0;z-index:200;background:var(--bg);overflow:auto;padding:24px 16px}
 @media print{body.printing-cert *{visibility:hidden}body.printing-cert #cert-card,body.printing-cert #cert-card *{visibility:visible}body.printing-cert #cert-card{position:fixed;inset:0;margin:auto;max-width:none;width:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}}
 @media (max-width:560px){.ac-hero{flex-direction:column;align-items:flex-start}.cert-k{font-size:1.5rem}.cert-name{font-size:1.4rem}}
+
+/* ===== academy lesson v2: sections, slides, visuals, one-by-one quiz ===== */
+.ac-secs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:4px -4px 12px;padding:4px;position:sticky;top:0;z-index:5;background:var(--surface)}
+.ac-sec{flex:none;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:8px 14px;font-weight:600;font-size:.9rem;min-height:40px}
+.ac-sec[aria-selected="true"]{background:var(--blue);border-color:var(--blue);color:var(--blue-ink)}
+.ac-deck{min-height:180px}
+.ac-slide{animation:acIn .28s ease}
+@keyframes acIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ac-slide{animation:none}}
+.ac-lead{font-size:1.06rem;line-height:1.9;margin:0 0 6px}
+.ac-viz{margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--sunk)}
+.ac-viz-t{font-weight:700;margin-bottom:6px;color:var(--blue)}
+.ac-dnav{display:flex;align-items:center;gap:8px;margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+.ac-dnav .btn{min-width:96px}
+.ac-dnav .btn:disabled{opacity:.4}
+.ac-dots{flex:1;display:flex;justify-content:center;gap:5px;flex-wrap:wrap}
+.ac-dots i{width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .2s,transform .2s}
+.ac-dots i.on{background:var(--blue)}
+.ac-qbar{display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--muted);margin-bottom:10px}
+.ac-qbar .ac-bar{flex:1}
+.ac-qq{font-size:1.08rem;font-weight:700;line-height:1.7;margin:0 0 10px}
+.ac-ans{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:start;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:12px;margin-bottom:8px;font-size:.98rem;min-height:48px;transition:border-color .15s,background .15s}
+.ac-ans:hover:not(:disabled){border-color:var(--blue)}
+.ac-ak{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--sunk);font-weight:700;font-size:.85rem}
+.ac-ans.right{border-color:var(--ok);background:var(--ok-soft)}.ac-ans.right .ac-ak{background:var(--ok);color:#fff}
+.ac-ans.wrong{border-color:var(--bad);background:var(--bad-soft)}.ac-ans.wrong .ac-ak{background:var(--bad);color:#fff}
+.ac-ans:disabled{cursor:default}
+.ac-res{text-align:center;padding:18px;border-radius:14px}
+.ac-res.ok{background:var(--ok-soft)}.ac-res.bad{background:var(--bad-soft)}
+.ac-res-n{font-size:2.2rem;font-weight:800;font-family:var(--f-display)}

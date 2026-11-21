@@ -1,0 +1,234 @@
+/* iCOOL Academy — instrument simulators (group: sims) */
+.acv-sims{display:flex;flex-direction:column;gap:10px;color:var(--ink);font-size:15px;line-height:1.5}
+.acv-sims-stage{background:var(--sunk);border:1px solid var(--line);border-radius:var(--r,10px);padding:6px}
+.acv-sims-svg{display:block;width:100%;height:auto}
+.acv-sims-chips{display:flex;flex-wrap:wrap;gap:6px}
+.acv-sims-chip,.acv-sims-btn{min-height:40px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:.9rem;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.acv-sims-btn{border-radius:10px;font-weight:600}
+.acv-sims-chip[aria-pressed=true]{background:var(--blue);border-color:var(--blue);color:var(--blue-ink,#fff);font-weight:600}
+.acv-sims-chip:focus-visible,.acv-sims-btn:focus-visible,.acv-sims-hot:focus-visible,.acv-sims-sl input:focus-visible,.acv-sims-in input:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+.acv-sims-btn:disabled{opacity:.45;cursor:not-allowed}
+.acv-sims-primary{background:var(--blue);border-color:var(--blue);color:var(--blue-ink,#fff)}
+.acv-sims-warnbtn{background:var(--warn-soft);border-color:var(--warn);color:var(--ink)}
+.acv-sims-warnbtn.acv-sims-done{background:var(--ok-soft);border-color:var(--ok)}
+.acv-sims-okbtn{background:var(--ok-soft);border-color:var(--ok);color:var(--ink)}
+.acv-sims-badbtn{background:var(--bad-soft);border-color:var(--bad);color:var(--ink)}
+.acv-sims-row{display:flex;flex-wrap:wrap;gap:8px}
+.acv-sims-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+@media (max-width:420px){.acv-sims-grid2{grid-template-columns:1fr}}
+/* slider */
+.acv-sims-sl{display:flex;flex-direction:column;gap:2px;min-width:0}
+.acv-sims-slh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.86rem;color:var(--muted)}
+.acv-sims-slv{font-family:var(--f-mono);font-weight:700;color:var(--ink);font-size:.95rem;white-space:nowrap}
+.acv-sims-sl input[type=range]{width:100%;height:40px;margin:0;accent-color:var(--blue);touch-action:pan-y}
+.acv-sims-sl-hi input[type=range],.acv-sims-sl[data-tone=p] input[type=range]{accent-color:var(--orange)}
+/* readouts */
+.acv-sims-reads{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:6px}
+.acv-sims-rd{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 8px;min-width:0}
+.acv-sims-rdl{font-size:.74rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acv-sims-rdv{font-family:var(--f-mono);font-weight:700;font-size:1.02rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acv-sims-rd[data-tone=ok]{border-color:var(--ok);background:var(--ok-soft)}
+.acv-sims-rd[data-tone=warn]{border-color:var(--warn);background:var(--warn-soft)}
+.acv-sims-rd[data-tone=bad]{border-color:var(--bad);background:var(--bad-soft)}
+/* info panel */
+.acv-sims-info{background:var(--blue-soft);border-inline-start:4px solid var(--blue);border-radius:8px;padding:9px 12px;font-size:.9rem}
+.acv-sims-info[data-tone=ok]{background:var(--ok-soft);border-color:var(--ok)}
+.acv-sims-info[data-tone=warn]{background:var(--warn-soft);border-color:var(--warn)}
+.acv-sims-info[data-tone=bad]{background:var(--bad-soft);border-color:var(--bad)}
+.acv-sims-note{display:block;margin-top:4px;font-size:.8rem;color:var(--muted)}
+/* calc / quiz / table */
+.acv-sims-calc,.acv-sims-quiz{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.acv-sims-qh{font-weight:700;font-size:.92rem}
+.acv-sims-calcrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end}
+.acv-sims-in{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--muted)}
+.acv-sims-in input{min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:var(--f-mono);font-size:1rem;padding:0 10px;width:100%;box-sizing:border-box;text-align:left}
+.acv-sims-in1{max-width:240px}
+.acv-sims-calcout{font-family:var(--f-mono);font-weight:700;font-size:.92rem;padding:8px 10px;border-radius:8px;background:var(--sunk);text-align:left;overflow-wrap:anywhere}
+.acv-sims-calcout[data-tone=ok]{background:var(--ok-soft);color:var(--ok)}
+.acv-sims-calcout[data-tone=warn]{background:var(--warn-soft);color:var(--warn)}
+.acv-sims-calcout[data-tone=bad]{background:var(--bad-soft);color:var(--bad)}
+.acv-sims-qrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.acv-sims-qn{font-weight:700;min-width:52px}
+.acv-sims-tblg{display:flex;flex-wrap:wrap;gap:6px}
+.acv-sims-tblc{display:flex;gap:8px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-family:var(--f-mono);font-size:.9rem}
+.acv-sims-tblc span{color:var(--muted)}
+.acv-sims-tbl:empty{display:none}
+.acv-sims-dec[style*="none"]{display:none}
+/* progress (scale) */
+.acv-sims-prog{position:relative;height:14px;border-radius:7px;background:var(--sunk);border:1px solid var(--line);overflow:hidden;direction:ltr}
+.acv-sims-progf{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--blue);transition:width .25s}
+.acv-sims-progf[data-tone=ok]{background:var(--ok)}
+.acv-sims-progf[data-tone=bad]{background:var(--bad)}
+.acv-sims-progz{position:absolute;top:0;bottom:0;border-left:2px solid var(--ok);border-right:2px solid var(--ok);background:color-mix(in srgb,var(--ok) 25%,transparent)}
+
+/* ---------- SVG ---------- */
+.acv-sims-t{fill:var(--ink);font-family:var(--f-body,system-ui,sans-serif);font-size:14px}
+.acv-sims-lab2{font-size:15px;font-weight:700;fill:var(--muted)}
+.acv-sims-lab3{font-size:13px;fill:var(--muted)}
+.acv-sims-ax{font-size:12.5px;fill:var(--muted);font-family:var(--f-mono)}
+.acv-sims-ax-ok{fill:var(--ok);font-weight:700}
+.acv-sims-ax-w{fill:var(--warn);font-weight:700}
+.acv-sims-plotbg{fill:var(--surface);stroke:var(--line)}
+.acv-sims-grid{stroke:var(--line);stroke-width:1}
+.acv-sims-curve{fill:none;stroke:var(--blue);stroke-width:2.5;stroke-linejoin:round}
+.acv-sims-curve2{fill:none;stroke:var(--blue);stroke-width:1.8;stroke-dasharray:5 4;opacity:.75}
+.acv-sims-xh{stroke:var(--orange);stroke-width:1.3;stroke-dasharray:4 3}
+.acv-sims-dot{fill:var(--orange);stroke:var(--surface);stroke-width:2.5}
+.acv-sims-dot2{fill:var(--blue);stroke:var(--surface);stroke-width:2}
+/* gauge */
+.acv-sims-bezel{fill:var(--surface);stroke-width:7}
+.acv-sims-bz-n{stroke:var(--muted)}
+.acv-sims-bz-lo{stroke:var(--blue)}
+.acv-sims-bz-hi{stroke:var(--bad)}
+.acv-sims-face{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+.acv-sims-tk{stroke:var(--ink);stroke-width:1.1}
+.acv-sims-tk2{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round}
+.acv-sims-gl{font-size:13.5px;font-weight:700;font-family:var(--f-mono)}
+.acv-sims-gtl{font-size:11.5px;font-weight:600;font-family:var(--f-mono)}
+.acv-sims-ttk{stroke-width:1.4}
+path.acv-sims-tarc{fill:none;stroke-width:1.2;opacity:.6}
+.acv-sims-tc-lo,.acv-sims-tc-n{fill:var(--blue);stroke:var(--blue)}
+.acv-sims-tc-hi{fill:var(--bad);stroke:var(--bad)}
+text.acv-sims-tc-lo,text.acv-sims-tc-hi,text.acv-sims-tc-n{stroke:none}
+.acv-sims-gu{font-size:12.5px;fill:var(--muted);font-family:var(--f-mono)}
+.acv-sims-gtitle{font-size:13px;font-weight:800;letter-spacing:.5px}
+.acv-sims-vacband{fill:none;stroke:var(--blue);stroke-width:5;opacity:.35}
+.acv-sims-redband{fill:none;stroke:var(--bad);stroke-width:7;opacity:.8}
+.acv-sims-needle.acv-sims-anim{transition:transform .35s cubic-bezier(.3,1.4,.5,1)}
+.acv-sims-ndl{stroke:none}
+.acv-sims-nd-n,.acv-sims-nd-hi{fill:var(--bad)}
+.acv-sims-nd-lo{fill:var(--blue)}
+.acv-sims-hub{fill:var(--ink)}
+.acv-sims-hub2{fill:var(--surface)}
+.acv-sims-lcd{fill:color-mix(in srgb,var(--ok-soft) 70%,var(--sunk));stroke:var(--line);stroke-width:1.2}
+.acv-sims-lcdt{font-family:var(--f-mono);font-weight:700;font-size:13.5px}
+.acv-sims-lcdm{font-family:var(--f-mono);font-weight:700;font-size:17px}
+.acv-sims-lcdbig{font-family:var(--f-mono);font-weight:700;font-size:28px}
+.acv-sims-lcdu{font-family:var(--f-mono);font-weight:700;font-size:13px;fill:var(--muted)}
+.acv-sims-lcds{font-family:var(--f-mono);font-size:11.5px;fill:var(--muted)}
+/* manifold */
+.acv-sims-mbody{fill:var(--sunk);stroke:var(--muted);stroke-width:1.8}
+.acv-sims-brass{fill:color-mix(in srgb,#c9a227 70%,var(--surface));stroke:color-mix(in srgb,#8a6d10 70%,var(--ink));stroke-width:1.3}
+.acv-sims-sight{fill:var(--blue-soft);stroke:var(--muted);stroke-width:1.5}
+.acv-sims-knob-lo{fill:var(--blue)}
+.acv-sims-knob-hi{fill:var(--bad)}
+.acv-sims-hose{fill:none;stroke-width:6;stroke-linecap:round}
+.acv-sims-hose-lo{stroke:var(--blue)}
+.acv-sims-hose-hi{stroke:var(--bad)}
+.acv-sims-hose-y{stroke:color-mix(in srgb,#e0b400 85%,var(--ink))}
+.acv-sims-pipe-suc{stroke:var(--blue);stroke-width:13;stroke-linecap:round;opacity:.85}
+.acv-sims-pipe-liq{stroke:var(--orange);stroke-width:8;stroke-linecap:round}
+.acv-sims-clamp{stroke-width:2}
+.acv-sims-clamp-lo{fill:var(--blue-soft);stroke:var(--blue)}
+.acv-sims-clamp-hi{fill:var(--orange-soft);stroke:var(--orange)}
+.acv-sims-wire{fill:none;stroke:var(--muted);stroke-width:2}
+/* DMM */
+.acv-sims-holster{fill:var(--orange)}
+.acv-sims-holster-b{fill:var(--blue)}
+.acv-sims-mface{fill:var(--surface);stroke:var(--line)}
+.acv-sims-dialring{fill:var(--sunk);stroke:var(--line)}
+.acv-sims-dial{fill:var(--sunk);stroke:var(--muted);stroke-width:2}
+.acv-sims-dialp{stroke:var(--orange);stroke-width:4;stroke-linecap:round}
+.acv-sims-dialm{font-size:12px;font-weight:700;fill:var(--muted);font-family:var(--f-mono)}
+.acv-sims-dialon{fill:var(--orange)}
+.acv-sims-jack-k{fill:var(--ink);stroke:var(--line);stroke-width:2}
+.acv-sims-jack-r{fill:var(--bad);stroke:var(--line);stroke-width:2}
+.acv-sims-jl{font-size:11px;font-weight:700;fill:var(--muted);font-family:var(--f-mono)}
+.acv-sims-lead{fill:none;stroke-width:3.5;stroke-linecap:round}
+.acv-sims-lead-k{stroke:var(--ink)}
+.acv-sims-lead-r{stroke:var(--bad)}
+.acv-sims-ptip{stroke-width:2.5}
+.acv-sims-ptip.acv-sims-lead-k{fill:var(--ink)}
+.acv-sims-ptip.acv-sims-lead-r{fill:var(--bad)}
+/* compressor */
+.acv-sims-shell{fill:color-mix(in srgb,var(--muted) 22%,var(--surface));stroke:var(--muted);stroke-width:2}
+.acv-sims-weld{stroke:var(--muted);stroke-width:1.5;opacity:.6}
+.acv-sims-foot{fill:var(--muted);opacity:.7}
+.acv-sims-copper{fill:#c06a3a;stroke:#8a4422;stroke-width:1}
+.acv-sims-plate{fill:var(--sunk);stroke:var(--muted);stroke-width:2}
+.acv-sims-plate2{fill:none;stroke:var(--line);stroke-width:1.5}
+.acv-sims-glass{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+.acv-sims-pin{fill:color-mix(in srgb,#c9a227 60%,var(--muted));stroke:var(--ink);stroke-width:1}
+.acv-sims-bolt{fill:var(--sunk);stroke:var(--muted);stroke-width:2}
+.acv-sims-boltx{stroke:var(--muted);stroke-width:2}
+.acv-sims-pinlab{font-size:16px;font-weight:800;fill:var(--ink);font-family:var(--f-mono)}
+.acv-sims-hit{fill:transparent;stroke:transparent;stroke-width:2.5;cursor:pointer}
+.acv-sims-hit:hover{stroke:var(--line)}
+.acv-sims-hit.acv-sims-sel{stroke:var(--orange);stroke-dasharray:4 3}
+.acv-sims-hot{outline:none}
+/* megger */
+.acv-sims-scaleface{fill:color-mix(in srgb,var(--warn-soft) 55%,var(--surface));stroke:var(--line)}
+.acv-sims-bandok{fill:none;stroke:var(--ok);stroke-width:6;opacity:.6}
+.acv-sims-bandwarn{fill:none;stroke:var(--warn);stroke-width:6;opacity:.7}
+.acv-sims-bandbad{fill:none;stroke:var(--bad);stroke-width:6;opacity:.6}
+.acv-sims-mneedle{stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;transition:none}
+.acv-sims-testbtn{fill:var(--bad);stroke:var(--surface);stroke-width:3}
+.acv-sims-testt{font-size:12px;font-weight:800;fill:#fff;font-family:var(--f-mono)}
+/* capacitor */
+.acv-sims-can{fill:color-mix(in srgb,var(--muted) 30%,var(--surface));stroke:var(--muted);stroke-width:2}
+.acv-sims-cantop{fill:color-mix(in srgb,var(--muted) 45%,var(--surface));stroke:var(--muted);stroke-width:2}
+.acv-sims-sticker{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.2}
+.acv-sims-capt{font-size:20px;font-weight:800;font-family:var(--f-mono);fill:var(--blue)}
+.acv-sims-caps{font-size:13px;font-weight:700;font-family:var(--f-mono)}
+.acv-sims-caps2{font-size:11.5px;font-family:var(--f-mono);fill:var(--muted)}
+.acv-sims-bandokf{fill:var(--ok)}
+.acv-sims-bandwarnf{fill:var(--warn)}
+.acv-sims-bandbadf{fill:var(--bad);opacity:.75}
+.acv-sims-mark{fill:var(--ink);stroke:var(--surface);stroke-width:1.5}
+.acv-sims-spark{opacity:0}
+.acv-sims-sparkp{fill:var(--warn);stroke:var(--orange);stroke-width:1}
+.acv-sims-sparkon{animation:acv-sims-spark .7s ease-out}
+@keyframes acv-sims-spark{0%,60%{opacity:1}100%{opacity:0}}
+/* vacuum */
+.acv-sims-vhose{fill:none;stroke:color-mix(in srgb,#e0b400 85%,var(--ink));stroke-width:7;stroke-linecap:round}
+.acv-sims-vflow{fill:none;stroke:var(--surface);stroke-width:2;stroke-dasharray:3 9;opacity:0}
+.acv-sims-flowon{opacity:.9;animation:acv-sims-dash .6s linear infinite}
+@keyframes acv-sims-dash{to{stroke-dashoffset:-12}}
+.acv-sims-pump{fill:var(--blue);stroke:var(--blue);stroke-width:2}
+.acv-sims-pumpm{fill:color-mix(in srgb,var(--blue) 60%,var(--ink))}
+.acv-sims-handle{fill:none;stroke:var(--muted);stroke-width:4;stroke-linejoin:round}
+.acv-sims-fanc{fill:var(--sunk);stroke:var(--surface);stroke-width:2}
+.acv-sims-blade{fill:var(--muted)}
+.acv-sims-spin{animation:acv-sims-rot .5s linear infinite}
+@keyframes acv-sims-rot{to{transform:rotate(360deg)}}
+.acv-sims-lever{fill:var(--bad);transition:transform .3s}
+.acv-sims-mgauge{fill:var(--sunk);stroke:var(--muted);stroke-width:2}
+.acv-sims-mgauge+ .acv-sims-lcd{stroke:none}
+.acv-sims-unit{fill:var(--surface);stroke:var(--muted);stroke-width:2}
+.acv-sims-grille{fill:none;stroke:var(--muted);stroke-width:1.5}
+.acv-sims-lim-ok{stroke:var(--ok);stroke-width:1.6;stroke-dasharray:6 4}
+.acv-sims-lim-w{stroke:var(--warn);stroke-width:1.6;stroke-dasharray:6 4}
+.acv-sims-vline-p{fill:none;stroke:var(--blue);stroke-width:2.5;stroke-linejoin:round}
+.acv-sims-vline-d{fill:none;stroke:var(--orange);stroke-width:2.5;stroke-linejoin:round}
+.acv-sims-isoline{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:2 3}
+/* pressure test */
+.acv-sims-n2{fill:color-mix(in srgb,var(--muted) 60%,var(--ink));stroke:var(--ink);stroke-width:1}
+.acv-sims-n2band{fill:var(--surface);opacity:.85}
+.acv-sims-n2t{font-size:16px;font-weight:800;fill:var(--surface)}
+.acv-sims-mini{fill:var(--surface);stroke:var(--muted);stroke-width:2}
+.acv-sims-mini-n{stroke:var(--bad);stroke-width:1.8}
+.acv-sims-thermo{fill:var(--surface);stroke:var(--muted);stroke-width:1.5}
+.acv-sims-merc,.acv-sims-bulb{fill:var(--bad)}
+.acv-sims-pmeas{fill:none;stroke:var(--orange);stroke-width:2.5;stroke-linejoin:round}
+.acv-sims-pexp{fill:none;stroke:var(--blue);stroke-width:2;stroke-dasharray:6 4}
+/* scale */
+.acv-sims-platform{fill:var(--sunk);stroke:var(--muted);stroke-width:2}
+.acv-sims-scalebase{fill:var(--muted)}
+.acv-sims-cyl{fill:color-mix(in srgb,var(--blue) 25%,var(--surface));stroke:var(--blue);stroke-width:2}
+.acv-sims-cylband{fill:var(--blue)}
+.acv-sims-cylband.acv-sims-flam{fill:var(--bad)}
+.acv-sims-cylband.acv-sims-a2l{fill:var(--warn)}
+.acv-sims-cylt{font-size:14px;font-weight:800;font-family:var(--f-mono)}
+.acv-sims-vhandle{fill:var(--bad);transition:transform .2s}
+.acv-sims-sflow{fill:none;stroke:var(--surface);stroke-width:2;stroke-dasharray:3 9;opacity:0}
+.acv-sims-sflow.acv-sims-flowon{animation:acv-sims-dash .3s linear 2;opacity:.9}
+.acv-sims-flamtri{fill:var(--warn-soft);stroke:var(--warn);stroke-width:2.5;stroke-linejoin:round}
+.acv-sims-flamico{fill:var(--bad)}
+.acv-sims-flaml{font-size:13px;font-weight:800;fill:var(--bad);font-family:var(--f-mono)}
+/* ntc */
+.acv-sims-pipe-cu{fill:#c06a3a;stroke:#8a4422;stroke-width:1}
+.acv-sims-clip{fill:none;stroke:var(--muted);stroke-width:2.5;stroke-linejoin:round}
+.acv-sims-bead{fill:var(--ink);stroke:var(--muted);stroke-width:1.5}
+.acv-sims-ntcw{fill:none;stroke:var(--muted);stroke-width:2.2}
+.acv-sims-plug{fill:var(--surface);stroke:var(--muted);stroke-width:1.5}
+@media (prefers-reduced-motion:reduce){.acv-sims-needle.acv-sims-anim,.acv-sims-lever,.acv-sims-vhandle,.acv-sims-progf{transition:none}.acv-sims-spin,.acv-sims-flowon,.acv-sims-sparkon{animation:none}}

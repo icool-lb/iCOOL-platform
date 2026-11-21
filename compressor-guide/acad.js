@@ -66,50 +66,99 @@ function courseView() {
   bindCertBtns();
 }
 
-/* ---------- lesson ---------- */
+/* ---------- lesson: slides → practice → steps → quiz ---------- */
+const VIZ_OK = () => !!(window.ACV && Object.keys(window.ACV.W).length);
+function vizBlock(v) { return `<figure class="ac-viz" data-viz='${esc(JSON.stringify({ w: v.w, p: v.p || {} }))}'>${v.title ? `<figcaption class="ac-viz-t">${esc(v.title)}</figcaption>` : ""}<div class="ac-viz-h"></div>${v.cap ? `<div class="acv-cap">${esc(v.cap)}</div>` : ""}</figure>`; }
+function mountViz(root) {
+  $$(".ac-viz", root).forEach((f) => { if (f.dataset.done) return; f.dataset.done = "1";
+    let spec; try { spec = JSON.parse(f.dataset.viz); } catch (e) { f.remove(); return; }
+    if (!window.ACV || !window.ACV.render($(".ac-viz-h", f), spec, { kb: S().KB })) f.remove(); });
+}
 function lessonView() {
   const c = course(VIEW.c); const idx = c ? c.lessons.findIndex((l) => l.id === VIEW.l) : -1; if (idx < 0) return go({ v: "home" });
   const l = c.lessons[idx], p = prog(l.id), nx = c.lessons[idx + 1];
+  const vis = (l.visuals || []).filter((v) => !VIZ_OK() || window.ACV.W[v.w]);
+  const body = l.body_ar || [];
+  // slides: one per paragraph, with the visuals placed at that paragraph; then key points
+  const slides = body.map((t, i) => ({ t, v: vis.filter((v) => (v.at == null ? 0 : v.at) === i) }));
+  const practice = vis.filter((v) => v.at === "practice" || (typeof v.at === "number" && v.at >= body.length));
   const list = (t, arr, cls) => (arr || []).length ? `<div class="ac-box ${cls}"><b>${t}</b><ul>${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
   const guides = (l.guide_refs || []).map((id) => (S().KB.guides || []).find((g) => g.id === id)).filter(Boolean);
+  const secs = [["learn", "📖 الشرح"], ...(practice.length ? [["practice", "🧪 جرّب بنفسك"]] : []), ...((l.steps || []).length ? [["steps", "🛠 خطوات عملية"]] : []), ["quiz", "📝 الاختبار"]];
   host().innerHTML = `<button class="btn ghost sm" type="button" data-back>→ ${esc(c.title_ar)}</button>
-    <article class="ac-lesson"><div class="stat">الدرس ${idx + 1} من ${c.lessons.length}${l.minutes ? ` · ${l.minutes} دقيقة` : ""}</div><h2>${esc(l.title_ar)}</h2>
-      ${(l.body_ar || []).map((t) => `<p>${esc(t)}</p>`).join("")}
-      ${list("🔑 نقاط يجب حفظها", l.key_points, "key")}
-      <div class="ac-two">${list("🧰 العدّة", l.tools, "tools")}${list("⚠️ السلامة", l.safety, "safe")}</div>
-      ${(l.steps || []).length ? `<h3 class="sec">خطوات عملية تفاعلية</h3><div id="ac-steps"></div>` : ""}
-      ${list("❌ أخطاء شائعة عند المعلمين", l.mistakes, "bad")}
-      ${guides.length ? `<div class="ac-box"><b>📚 أدلة مرتبطة في المكتبة</b><div class="bar">${guides.map((g) => `<button class="btn ghost sm" type="button" data-guide="${esc(g.id)}">${esc(g.title_ar)}</button>`).join("")}</div></div>` : ""}
-      ${(l.refs || []).filter((r) => /^https?:/.test(r.url || "")).length ? `<div class="stat">مراجع: ${l.refs.filter((r) => /^https?:/.test(r.url || "")).map((r) => `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.title || r.url)}</a>`).join(" · ")}</div>` : ""}
-      <h3 class="sec" id="ac-qh">📝 اختبار الدرس <small class="stat">النجاح ${PASS}%${p ? ` · أفضل نتيجة ${p.score}/${p.total}` : ""}</small></h3>
-      <form id="ac-quiz" class="ac-quiz">${(l.quiz || []).map((q, i) => `<fieldset class="ac-q" data-q="${i}"><legend>${i + 1}. ${esc(q.q)}</legend>${q.options.map((o, k) => `<label class="ac-opt"><input type="radio" name="q${i}" value="${k}"><span>${esc(o)}</span></label>`).join("")}<div class="ac-why" hidden></div></fieldset>`).join("")}
-        <div class="bar"><button class="btn" type="submit">تصحيح الاختبار</button><span class="stat" id="ac-qmsg"></span></div></form>
-      <div id="ac-after"></div>
+    <article class="ac-lesson"><div class="stat">الدرس ${idx + 1} من ${c.lessons.length}${l.minutes ? ` · ${l.minutes} دقيقة` : ""}${p && p.passed ? " · ✓ ناجح" : ""}</div><h2>${esc(l.title_ar)}</h2>
+      <nav class="ac-secs" role="tablist">${secs.map(([k, t], i) => `<button type="button" role="tab" class="ac-sec" data-sec="${k}" aria-selected="${i === 0}">${t}</button>`).join("")}</nav>
+      <section class="ac-pane" data-pane="learn">
+        <div class="ac-deck">${slides.map((sl, i) => `<div class="ac-slide" data-i="${i}" ${i ? "hidden" : ""}><p class="ac-lead">${esc(sl.t)}</p>${sl.v.map(vizBlock).join("")}</div>`).join("")}
+          <div class="ac-slide" data-i="${slides.length}" ${slides.length ? "hidden" : ""}>${list("🔑 نقاط يجب حفظها", l.key_points, "key")}<div class="ac-two">${list("🧰 العدّة", l.tools, "tools")}${list("⚠️ السلامة", l.safety, "safe")}</div>${list("❌ أخطاء شائعة عند المعلمين", l.mistakes, "bad")}
+            ${guides.length ? `<div class="ac-box"><b>📚 أدلة مرتبطة في المكتبة</b><div class="bar">${guides.map((g) => `<button class="btn ghost sm" type="button" data-guide="${esc(g.id)}">${esc(g.title_ar)}</button>`).join("")}</div></div>` : ""}</div></div>
+        <div class="ac-dnav"><button class="btn ghost sm" type="button" data-sl="-1">→ السابق</button><span class="ac-dots">${[...slides, 1].map((_, i) => `<i data-d="${i}" class="${i ? "" : "on"}"></i>`).join("")}</span><button class="btn sm" type="button" data-sl="1">التالي ←</button></div>
+      </section>
+      ${practice.length ? `<section class="ac-pane" data-pane="practice" hidden><p class="stat">جرّب بيدك: حرّك، اضغط، واختر — هكذا تتثبّت المعلومة.</p>${practice.map(vizBlock).join("")}<div class="bar"><button class="btn sm" type="button" data-goto="${secs[2] ? secs[2][0] : "quiz"}">التالي ←</button></div></section>` : ""}
+      ${(l.steps || []).length ? `<section class="ac-pane" data-pane="steps" hidden><div id="ac-steps"></div><div class="bar" style="margin-top:10px"><button class="btn sm" type="button" data-goto="quiz">إلى الاختبار ←</button></div></section>` : ""}
+      <section class="ac-pane" data-pane="quiz" hidden><div id="ac-quiz"></div><div id="ac-after"></div></section>
       <div class="bar ac-nav">${idx > 0 ? `<button class="btn ghost sm" type="button" data-lesson="${esc(c.lessons[idx - 1].id)}">→ الدرس السابق</button>` : ""}<span class="sp"></span>${nx ? `<button class="btn ghost sm" type="button" data-lesson="${esc(nx.id)}">الدرس التالي ←</button>` : ""}</div>
     </article>`;
+  const art = $(".ac-lesson");
   $("[data-back]").addEventListener("click", () => go({ v: "course", c: c.id }));
-  $$("[data-lesson]").forEach((b) => b.addEventListener("click", () => go({ v: "lesson", c: c.id, l: b.dataset.lesson })));
-  $$("[data-guide]").forEach((b) => b.addEventListener("click", () => { S().setTab("lib"); setTimeout(() => S().openGuide(b.dataset.guide), 50); }));
-  if ((l.steps || []).length) S().makeStepper($("#ac-steps"), l.steps, [], null, { learn: true });
-  $("#ac-quiz").addEventListener("submit", async (e) => {
-    e.preventDefault(); const qs = l.quiz || []; let sc = 0, miss = 0;
-    qs.forEach((q, i) => { const sel = $(`input[name="q${i}"]:checked`); if (!sel) { miss++; return; } });
-    if (miss) { $("#ac-qmsg").textContent = `أجب عن كل الأسئلة (باقي ${miss}).`; return; }
-    qs.forEach((q, i) => { const fs = $(`[data-q="${i}"]`), v = +$(`input[name="q${i}"]:checked`).value, ok = v === q.a; if (ok) sc++;
-      $$(".ac-opt", fs).forEach((lb, k) => { lb.classList.toggle("right", k === q.a); lb.classList.toggle("wrong", k === v && !ok); });
-      const w = $(".ac-why", fs); w.hidden = false; w.className = "ac-why " + (ok ? "ok" : "bad"); w.innerHTML = `<b>${ok ? "✓ صحيح" : "✗ خطأ"}</b> — ${esc(q.why || "")}`; });
+  $$("[data-lesson]", art).forEach((b) => b.addEventListener("click", () => go({ v: "lesson", c: c.id, l: b.dataset.lesson })));
+  $$("[data-guide]", art).forEach((b) => b.addEventListener("click", () => { S().setTab("lib"); setTimeout(() => S().openGuide(b.dataset.guide), 50); }));
+  // sections
+  let stepsMade = false, quizMade = false;
+  const show = (k) => { $$(".ac-sec", art).forEach((b) => b.setAttribute("aria-selected", b.dataset.sec === k)); $$(".ac-pane", art).forEach((x) => { x.hidden = x.dataset.pane !== k; });
+    const pane = $(`[data-pane="${k}"]`, art); mountViz(pane);
+    if (k === "steps" && !stepsMade) { stepsMade = true; S().makeStepper($("#ac-steps"), l.steps, [], null, { learn: true }); }
+    if (k === "quiz" && !quizMade) { quizMade = true; quiz(c, l, nx); }
+    $(".ac-secs", art).scrollIntoView({ behavior: "smooth", block: "start" }); };
+  $$(".ac-sec", art).forEach((b) => b.addEventListener("click", () => show(b.dataset.sec)));
+  $$("[data-goto]", art).forEach((b) => b.addEventListener("click", () => show(b.dataset.goto)));
+  // slides
+  let cur = 0; const n = slides.length + 1;
+  const deck = $(".ac-deck", art);
+  const slide = (i) => { cur = Math.max(0, Math.min(n - 1, i));
+    $$(".ac-slide", deck).forEach((x) => { x.hidden = +x.dataset.i !== cur; });
+    $$(".ac-dots i", art).forEach((d) => d.classList.toggle("on", +d.dataset.d <= cur));
+    $('[data-sl="-1"]', art).disabled = cur === 0;
+    const nb = $('[data-sl="1"]', art); nb.textContent = cur === n - 1 ? (secs[1] ? `${secs[1][1]} ←` : "التالي ←") : "التالي ←";
+    mountViz($(`.ac-slide[data-i="${cur}"]`, deck)); };
+  $('[data-sl="-1"]', art).addEventListener("click", () => { slide(cur - 1); deck.scrollIntoView({ behavior: "smooth", block: "nearest" }); });
+  $('[data-sl="1"]', art).addEventListener("click", () => { if (cur === n - 1) { show(secs[1][0]); return; } slide(cur + 1); $(".ac-secs", art).scrollIntoView({ behavior: "smooth", block: "start" }); });
+  let x0 = null; deck.addEventListener("touchstart", (e) => { if (e.target.closest(".ac-viz")) { x0 = null; return; } x0 = e.touches[0].clientX; }, { passive: true });
+  deck.addEventListener("touchend", (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 60) slide(cur + (dx > 0 ? 1 : -1)); x0 = null; });
+  slide(0);
+}
+
+function quiz(c, l, nx) {
+  const qs = l.quiz || [], box = $("#ac-quiz"); let i = 0, sc = 0;
+  if (!qs.length) { box.innerHTML = '<p class="stat">لا يوجد اختبار لهذا الدرس.</p>'; return; }
+  const draw = () => {
+    const q = qs[i];
+    box.innerHTML = `<div class="ac-qbar"><span>سؤال ${i + 1} من ${qs.length}</span><span class="ac-bar"><i style="width:${i * 100 / qs.length}%"></i></span><span>✓ ${sc}</span></div>
+      <div class="ac-q1"><p class="ac-qq">${esc(q.q)}</p>${q.options.map((o, k) => `<button type="button" class="ac-ans" data-k="${k}"><span class="ac-ak">${"أبجد"[k] || k + 1}</span><span>${esc(o)}</span></button>`).join("")}
+      <div class="ac-why" hidden></div><div class="bar"><button class="btn sm" type="button" id="ac-qnext" hidden>${i + 1 < qs.length ? "السؤال التالي ←" : "النتيجة ←"}</button></div></div>`;
+    $$(".ac-ans", box).forEach((b) => b.addEventListener("click", () => {
+      if (box.dataset.locked === "1") return; box.dataset.locked = "1";
+      const k = +b.dataset.k, ok = k === q.a; if (ok) sc++;
+      $$(".ac-ans", box).forEach((x) => { const kk = +x.dataset.k; x.disabled = true; x.classList.toggle("right", kk === q.a); x.classList.toggle("wrong", kk === k && !ok); });
+      const w = $(".ac-why", box); w.hidden = false; w.className = "ac-why " + (ok ? "ok" : "bad"); w.innerHTML = `<b>${ok ? "✓ صحيح" : "✗ ليس هذا"}</b> — ${esc(q.why || "")}`;
+      const nb = $("#ac-qnext"); nb.hidden = false; nb.focus();
+      nb.addEventListener("click", () => { box.dataset.locked = ""; i++; if (i < qs.length) draw(); else finish(); });
+    }));
+  };
+  const finish = async () => {
     const pass = sc * 100 >= qs.length * PASS;
-    $("#ac-qmsg").textContent = "جارِ الحفظ…";
+    box.innerHTML = `<div class="ac-res ${pass ? "ok" : "bad"}"><div class="ac-res-n">${sc} / ${qs.length}</div><div>${Math.round(sc * 100 / qs.length)}% — ${pass ? "🎉 نجحت" : "لم تنجح بعد (المطلوب " + PASS + "%)"}</div><div class="stat" id="ac-qmsg">جارِ الحفظ…</div></div>`;
     const j = await I().rpc("acad_submit", { p_code: I().CODE, p_device: I().DEV, p_course: c.id, p_lesson: l.id, p_score: sc, p_total: qs.length }).catch(() => null);
-    $("#ac-qmsg").textContent = j && j.ok ? "" : "تعذّر حفظ النتيجة (تحقّق من الإنترنت).";
+    $("#ac-qmsg").textContent = j && j.ok ? "تم حفظ النتيجة" : "تعذّر حفظ النتيجة (تحقّق من الإنترنت).";
     await loadState();
     const fin = done(c) === c.lessons.length && !cert(c.id);
-    $("#ac-after").innerHTML = `<div class="msg ${pass ? "ok" : "bad"}">${pass ? "🎉 نجحت" : "لم تنجح بعد"}: ${sc} / ${qs.length} (${Math.round(sc * 100 / qs.length)}%). ${pass ? "" : "راجع الشرح بالأعلى وأعد المحاولة."}
-      <div class="bar" style="margin-top:8px">${pass && nx ? `<button class="btn sm" type="button" data-lesson="${esc(nx.id)}">الدرس التالي ←</button>` : ""}${fin ? `<button class="btn warn sm" type="button" data-claim="${esc(c.id)}">🏅 استلم شهادة الدورة</button>` : ""}${!pass ? `<button class="btn ghost sm" type="button" data-retry>إعادة الاختبار</button>` : ""}</div></div>`;
+    $("#ac-after").innerHTML = `<div class="bar" style="justify-content:center;margin-top:10px">${pass && nx ? `<button class="btn sm" type="button" data-lesson="${esc(nx.id)}">الدرس التالي ←</button>` : ""}${fin ? `<button class="btn warn sm" type="button" data-claim="${esc(c.id)}">🏅 استلم شهادة الدورة</button>` : ""}<button class="btn ghost sm" type="button" data-retry>${pass ? "أعد الاختبار" : "إعادة الاختبار"}</button>${!pass ? `<button class="btn ghost sm" type="button" data-relearn>راجع الشرح</button>` : ""}</div>`;
     $$("#ac-after [data-lesson]").forEach((b) => b.addEventListener("click", () => go({ v: "lesson", c: c.id, l: b.dataset.lesson })));
-    const rt = $("#ac-after [data-retry]"); if (rt) rt.addEventListener("click", () => { lessonView(); $("#ac-qh").scrollIntoView({ behavior: "smooth" }); });
+    $("#ac-after [data-retry]").addEventListener("click", () => { $("#ac-after").innerHTML = ""; i = 0; sc = 0; draw(); });
+    const rl = $("#ac-after [data-relearn]"); if (rl) rl.addEventListener("click", () => $('.ac-sec[data-sec="learn"]').click());
     bindCertBtns();
-  });
+  };
+  draw();
 }
 
 /* ---------- certificates ---------- */
