@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>iCOOL Pricing</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0066A7">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="iCOOL تسعير">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top" id="top" hidden>
+  <div class="top-in">
+    <img class="logo" src="logo.png" alt="iCOOL">
+    <div class="top-t">
+      <div class="top-title" id="barTitle">التسعير</div>
+      <div class="top-sub" id="barSub"></div>
+    </div>
+    <button class="top-back" id="back" data-act="back" hidden aria-label="رجوع">‹ رجوع</button>
+  </div>
+</header>
+<main id="app" class="wrap"></main>
+<nav class="nav" id="nav" hidden>
+  <button data-go="projects" class="on"><span>📁</span>المشاريع</button>
+  <button data-go="catalog"><span>📚</span>البنود</button>
+  <button data-go="costs"><span>🧾</span>الموردين</button>
+  <button data-go="settings"><span>⚙️</span>الإعدادات</button>
+</nav>
+<div class="sheet-bg" id="sheetBg" hidden></div>
+<section class="sheet" id="sheet" hidden role="dialog" aria-modal="true"></section>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="print" class="print"></div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
