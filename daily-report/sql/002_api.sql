@@ -65,6 +65,9 @@ begin
   if p_action in ('visit_arrive', 'visit_leave', 'site_fix_gps', 'sitesheet_get', 'sitesheet_save', 'fix_apply', 'unified') then
     return dr.site_api(me, p_action, p, d);
 
+  elsif p_action in ('snap', 'snap_note', 'sheet_approve') then
+    return dr.snap_api(me, p_action, p, d);
+
   elsif p_action in ('photo_data', 'read_request', 'read_get') then
     return dr.read_api(me, p_action, p, d);
 

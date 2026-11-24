@@ -112,7 +112,7 @@ function uploadPhoto(file, kind, date, taskId) {
       if (!r.ok) return r.text().then(function (t) { throw new Error("ما انرفعت الصورة (" + r.status + ")"); });
       return api("photo_add", { path: path, kind: kind, date: date, task_id: taskId || "" }).then(function (j) {
         var ph = { id: j.id, path: path, kind: kind };
-        if (kind !== "sheet") return ph;
+        if (kind !== "sheet" && kind !== "invoice" && kind !== "site") return ph;
         // sheet photos are also kept for the claude.ai reader (it reaches Supabase only through SQL)
         return new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = function () { res(null); }; fr.readAsDataURL(blob); })
           .then(function (b64) { return b64 ? api("photo_data", { id: j.id, b64: b64 }).catch(function () { }) : null; }).then(function () { return ph; });
@@ -269,21 +269,54 @@ function loadDay() { return api("day", { date: S.date }).then(function (d) { S.d
 function vWorkerToday(app) {
   loading(app);
   loadDay().then(function (d) {
-    var h = dayBar();
-    var tasks = d.tasks || [], reps = d.reports || [];
-    var noRep = tasks.filter(function (t) { return t.status !== "done" && !reps.some(function (r) { return r.task_id === t.id && r.photo_ids.length; }); });
-    if (S.date === S.today && beirutHour() >= 15 && (noRep.length || !reps.length))
-      h += '<div class="banner warn">⚠️ <div><b>تقرير آخر النهار إلزامي</b><br>صوّر الشغل المنجز واكتب شو خلّصت' + (noRep.length ? " — باقي " + noRep.length + " مهمة بلا تقرير" : "") + ".</div></div>";
-    h += '<div class="sec-h"><h2>مهامي</h2></div>';
-    h += tasks.length ? tasks.map(function (t) { return taskCard(t); }).join("") : '<div class="card empty"><b>ما في مهام مسجّلة</b>إذا اشتغلت بموقع، اكتب تقرير تحت.</div>';
-    var mv = (d.visits || []).filter(function (v) { return v.user_id === S.me.id; });
-    h += '<div class="sec-h"><h2>دوامي بالمواقع</h2><button class="btn sm" data-act="freeSite">+ موقع بلا مهمة</button></div>';
-    h += mv.length ? '<div class="card tight">' + mv.map(function (v) { return visitLine(v).replace("</div></div>", '</div></div>' + (v.leave_at ? "" : '<button class="btn sm danger" data-act="leave" data-id="' + v.id + '">طلعت</button>') + '<button class="btn sm" data-act="siteSheet" data-site="' + v.site_id + '">📋</button>'); }).join("") + "</div>" : '<div class="tiny muted">كبّس «🟢 وصلت» لما توصل عالموقع و«🔴 طلعت» لما تفلّ — الوقت والمكان بيتسجّلوا لحالن.</div>';
-    h += '<div class="sec-h"><h2>تقاريري</h2><button class="btn sm pri" data-act="report">+ تقرير شغل</button></div>';
-    h += reps.length ? reps.map(repBlock).join("") : '<div class="card empty">لسا ما في تقرير لهالنهار</div>';
-    h += moneySection(d);
-    app.innerHTML = h;
+    var ov = myOpenVisit();
+    if (ov && S.date === S.today) return api("sitesheet_get", { site_id: ov.site_id, date: S.date }).then(function (ss) { drawWorkerDay(app, d, ov, ss); }, function () { drawWorkerDay(app, d, ov, null); });
+    drawWorkerDay(app, d, null, null);
   }, function (e) { app.innerHTML = dayBar() + '<div class="banner bad">' + esc(e.message) + "</div>"; });
+}
+var SNAPK = { work: ["📷", "صوّر الشغل", "after"], invoice: ["🧾", "صوّر فاتورة", "invoice"], goods: ["📦", "صوّر بضاعة", "site"], paper: ["📄", "صوّر ورقة", "sheet"] };
+function drawWorkerDay(app, d, ov, ss) {
+  var h = dayBar(), today = S.date === S.today, tasks = d.tasks || [];
+  if (ov) {
+    var sh = ss && ss.sheet, snaps = (sh && sh.snaps) || [];
+    h += '<div class="here"><div class="tiny">إنت هلّق بـ</div><div class="here-t">' + esc(ov.customer_name || "") + '</div><div class="small">' + esc(ov.site_label || "") + " · من " + esc(ov.arrive_hm || "") + "</div></div>";
+    h += '<div class="snapgrid">' + Object.keys(SNAPK).map(function (k) {
+      return '<label class="snapbtn snap-' + k + '"><span class="ic">' + SNAPK[k][0] + "</span>" + SNAPK[k][1] + '<input type="file" accept="image/*" capture="environment" multiple data-snap="' + k + '" data-site="' + ov.site_id + '"></label>';
+    }).join("") + "</div>";
+    if (S.snapBusy) h += '<div class="banner info"><span class="spin"></span> عم تنرفع ' + S.snapBusy + " صورة…</div>";
+    if (snaps.length) {
+      var cnt = {}; snaps.forEach(function (s) { if (s.user_id === S.me.id) cnt[s.kind] = (cnt[s.kind] || 0) + 1; });
+      h += '<div class="chips">' + Object.keys(cnt).map(function (k) { return '<span class="chip blue">' + SNAPK[k][0] + " " + cnt[k] + "</span>"; }).join("") +
+        (snaps.some(function (s) { return s.status === "pending"; }) ? '<span class="chip warn">عم تنقرا بالمكتب…</span>' : "") + "</div>";
+    }
+    h += '<div class="row" style="margin-top:12px"><input id="noteTx" class="grow" placeholder="ملاحظة؟ (فيك تحكي بالمايك 🎤 تبع الكيبورد)" style="border:1px solid var(--line);border-radius:12px;padding:12px;min-height:48px;background:var(--surface)"><button class="btn" data-act="snapNote" data-site="' + ov.site_id + '">ابعت</button></div>';
+    h += '<button class="btn danger block big" style="margin-top:14px" data-act="leave" data-id="' + ov.id + '">🔴 طلعت من الموقع</button>';
+  } else if (today) {
+    var sites = [], seen = {};
+    tasks.forEach(function (t) { if (t.site_id && !seen[t.site_id]) { seen[t.site_id] = 1; sites.push(t); } });
+    h += '<h2 style="margin-top:14px">وين رايح اليوم؟</h2>';
+    h += sites.map(function (t) {
+      var ml = mapLink(t.site);
+      return '<div class="card" style="margin-top:10px"><div class="here-t" style="color:var(--ink)">' + esc(t.customer ? t.customer.name : "") + '</div><div class="small muted">' + esc(siteText(t.site)) + " · " + esc(t.title) + (t.time ? " · " + esc(t.time) : "") + '</div><div class="acts">' +
+        '<button class="btn ok big grow" data-act="arrive" data-site="' + t.site_id + '" data-task="' + t.id + '">🟢 وصلت</button>' + (ml ? '<a class="btn" href="' + esc(ml) + '" target="_blank" rel="noopener">📍 الطريق</a>' : "") + "</div></div>";
+    }).join("") || '<div class="card empty">ما في مهام إلك اليوم.</div>';
+    h += '<button class="btn block" style="margin-top:12px" data-act="freeSite">📍 وصلت لموقع تاني</button>';
+  }
+  var done = (d.visits || []).filter(function (v) { return v.user_id === S.me.id && v.leave_at; });
+  if (done.length) h += '<h3>خلّصت اليوم</h3><div class="card tight">' + done.map(visitLine).join("") + "</div>";
+  h += '<div class="acts" style="margin-top:16px"><button class="btn sm ghost" data-act="payment">💵 سلفة / دفعة</button></div>';
+  app.innerHTML = h;
+}
+function doSnapFiles(el) {
+  var k = el.dataset.snap, sid = el.dataset.site, files = Array.prototype.slice.call(el.files || []);
+  if (!files.length) return;
+  S.snapBusy = (S.snapBusy || 0) + files.length; render();
+  files.reduce(function (p, f) {
+    return p.then(function () {
+      return uploadPhoto(f, SNAPK[k][2], S.today).then(function (ph) { return api("snap", { site_id: sid, kind: k, photo_id: ph.id }); })
+        .then(function () { toast(SNAPK[k][0] + " انبعتت ✓"); }, fail).then(function () { S.snapBusy--; });
+    });
+  }, Promise.resolve()).then(function () { S.snapBusy = 0; render(); });
 }
 function moneySection(d) {
   var h = '<div class="sec-h"><h2>فواتير ومدفوعات</h2></div><div class="acts"><button class="btn sm" data-act="expense" data-k="goods">🧾 فاتورة بضاعة</button><button class="btn sm" data-act="expense" data-k="fuel">⛽ محروقات</button><button class="btn sm" data-act="payment">💵 دفعة / مقبوض</button></div>';
@@ -571,6 +604,11 @@ function unifiedRows(u) {
   });
   return Object.keys(by).map(function (k) { return by[k]; });
 }
+function snapSummary(x) {
+  var sn = x.snaps || [], c = {}, pend = 0;
+  sn.forEach(function (s) { c[s.kind] = (c[s.kind] || 0) + 1; if (s.status === "pending") pend++; });
+  return Object.keys(c).map(function (k) { return '<span class="chip">' + (SNAPK[k] ? SNAPK[k][0] : "") + " " + c[k] + "</span>"; }).join("") + (pend ? '<span class="chip warn">' + pend + " عم تنقرا</span>" : "");
+}
 function openUnified(date) {
   date = date || S.date || S.today;
   api("unified", { date: date }).then(function (u) {
@@ -596,7 +634,7 @@ function openUnified(date) {
       return '<div class="card tight" style="margin-top:8px"><div class="row between"><b>' + esc(c.name) + " — " + esc(st.label || "") + '</b><span class="chip ' + (x.closed ? "ok" : "warn") + '">' + (x.closed ? "مسكّرة" : "مسودة") + (x.mode === "paper" ? " · ورقة" : "") + "</span></div>" +
         (x.work ? '<div class="small" style="white-space:pre-wrap">' + esc(x.work) + "</div>" : "") + grp("received") + grp("used") + grp("left") +
         (hasFix ? '<div class="small" style="color:var(--or)">تصحيح معلومات: ' + esc([fx.name, fx.phone, fx.address].filter(Boolean).join(" · ")) + (isAdmin() ? ' <button class="btn sm" data-act="fixApply" data-id="' + x.id + '">طبّق</button>' : "") + "</div>" : "") +
-        paperReadHtml(x.paper_read) + '<div class="thumbs noprint">' + thumbs(x.work_photos) + thumbs(x.paper_photos) + '</div><div class="acts noprint"><button class="btn sm" data-act="siteSheet" data-site="' + x.site_id + '">فتح</button></div></div>';
+        paperReadHtml(x.paper_read) + '<div class="thumbs noprint">' + thumbs(x.work_photos) + thumbs(x.paper_photos) + '</div><div class="acts noprint">' + (x.closed ? "" : '<button class="btn sm ok" data-act="sheetApprove" data-id="' + x.id + '">✓ اعتمد</button>') + '<button class="btn sm" data-act="siteSheet" data-site="' + x.site_id + '">فتح وتعديل</button>' + snapSummary(x) + "</div></div>";
     }).join("") || '<div class="tiny muted">ما في أوراق مواقع.</div>');
     var ex = u.expenses || [], py = u.payments || [];
     h += "<h3>مصاريف</h3>" + (ex.length ? '<table class="ut"><tr><th>البيان</th><th>الموقع</th><th>المصدر</th><th>مين دفع</th><th>المبلغ</th></tr>' + ex.map(function (e) { return "<tr><td>" + esc(e.item) + (e.vehicle ? " · " + esc(e.vehicle) : "") + "</td><td>" + esc((e.customer_name || "") + (e.site_label ? " — " + e.site_label : "") || e.site || "") + "</td><td>" + esc(e.source) + "</td><td>" + esc(e.paid_by || e.user_name) + '</td><td class="num">' + money(e.amount, e.currency) + "</td></tr>"; }).join("") + "</table>" : '<div class="tiny muted">ما في.</div>');
@@ -1255,6 +1293,7 @@ var ACT = {
     if (sid) go2(sid); else pickSiteThen(go2, el.dataset.cust || "", "بأي موقع وصلت؟");
   },
   leave: function (el) {
+    if (!isBoss() && !document.querySelector(".chips .chip.blue") && !confirm("ما صوّرت الشغل! بدك تطلع بلا صور؟")) return;
     if (!confirm("أكّد إنك طالع من الموقع؟")) return;
     var back = el.dataset.back;
     toast("عم جيب موقعك…");
@@ -1266,6 +1305,8 @@ var ACT = {
   pickSite: function (el) { var cb = S.pickCb; S.pickCb = null; closeSheet(); if (cb) cb(el.dataset.id); },
   freeSite: function () { pickSiteThen(function (id) { doArriveThen(id, "", "site"); }, "", "بأي موقع إنت؟"); },
   siteSheet: function (el) { openSiteSheet(el.dataset.site); },
+  snapNote: function (el) { var t = val("noteTx"); if (!t) return toast("اكتب الملاحظة"); el.disabled = true; api("snap_note", { site_id: el.dataset.site, text: t }).then(function () { toast("انبعتت ✓"); render(); }, function (e) { el.disabled = false; fail(e); }); },
+  sheetApprove: function (el) { el.disabled = true; api("sheet_approve", { id: el.dataset.id }).then(function () { toast("اعتُمد ✓"); openUnified(S.cache.unified && S.cache.unified.date); }, function (e) { el.disabled = false; fail(e); }); },
   sfMode: function (el) { S.sf.mode = el.dataset.m; drawSiteSheet(); },
   sfAdd: function (el) { var k = el.dataset.k; S.sf.materials.push({ item: "", qty: "", kind: k, place: k === "used" ? "بالموقع" : k === "left" ? "بالموقع" : "بالموقع", source: "" }); drawSiteSheet(); },
   sfDel: function (el) { S.sf.materials.splice(+el.dataset.i, 1); drawSiteSheet(); },
@@ -1391,6 +1432,7 @@ document.addEventListener("click", function (e) {
 });
 document.addEventListener("change", function (e) {
   var el = e.target;
+  if (el.dataset && el.dataset.snap) { doSnapFiles(el); return; }
   if (el.dataset && el.dataset.up) {
     var key = el.dataset.up, kind = el.dataset.kind, files = Array.prototype.slice.call(el.files || []);
     if (!files.length || !S.form) return;

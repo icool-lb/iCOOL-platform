@@ -1,5 +1,5 @@
 /* minimal service worker: app shell cache, network-first; never caches API or photos */
-var C = "icool-dr-v6", SHELL = ["/", "/index.html", "/app.css", "/app.js", "/config.js", "/logo.png", "/icon-192.png"];
+var C = "icool-dr-v7", SHELL = ["/", "/index.html", "/app.css", "/app.js", "/config.js", "/logo.png", "/icon-192.png"];
 self.addEventListener("install", function (e) { e.waitUntil(caches.open(C).then(function (c) { return c.addAll(SHELL); })); self.skipWaiting(); });
 self.addEventListener("activate", function (e) { e.waitUntil(caches.keys().then(function (k) { return Promise.all(k.filter(function (x) { return x !== C; }).map(function (x) { return caches.delete(x); })); })); self.clients.claim(); });
 self.addEventListener("fetch", function (e) {

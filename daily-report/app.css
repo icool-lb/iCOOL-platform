@@ -182,3 +182,13 @@ h3{font-family:var(--f-display);font-size:16px;margin:14px 0 6px}
   .ut th,.ut td{border-color:#555}
   .pr-head{border-color:#0066A7}
 }
+
+/* photo-first worker day */
+.here{background:var(--blue);color:#fff;border-radius:18px;padding:16px 18px;margin-top:12px}
+.here-t{font-size:22px;font-weight:700;line-height:1.2}
+.snapgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.snapbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:112px;border-radius:18px;background:var(--surface);border:2px solid var(--line);font-weight:700;font-size:16px;cursor:pointer;text-align:center}
+.snapbtn .ic{font-size:36px;line-height:1}
+.snapbtn input{display:none}
+.snap-work{border-color:var(--blue)}
+.btn.big{min-height:56px;font-size:17px}
