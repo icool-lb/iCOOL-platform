@@ -32,8 +32,8 @@ declare p dr.plans; c int := 0;
 begin
   for p in select * from dr.plans where active and next_date <= current_date + 7 loop
     if not exists (select 1 from dr.tasks where plan_id = p.id and date = p.next_date) then
-      insert into dr.tasks(date, customer_id, title, kind, details, assignees, plan_id)
-      values (p.next_date, p.customer_id, p.title, p.kind, p.notes, p.assignees, p.id);
+      insert into dr.tasks(date, customer_id, site_id, title, kind, details, assignees, plan_id)
+      values (p.next_date, p.customer_id, p.site_id, p.title, p.kind, p.notes, p.assignees, p.id);
       c := c + 1;
     end if;
     update dr.plans set next_date = next_date + every_days where id = p.id and next_date <= current_date + 7
@@ -85,7 +85,7 @@ begin
   elsif p_action = 'day' then
     return jsonb_build_object(
       'date', d,
-      'tasks', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('customer', (select to_jsonb(c) from dr.customers c where c.id = x.customer_id)) order by x.time nulls last, x.created_at), '[]')
+      'tasks', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('customer', (select to_jsonb(c) from dr.customers c where c.id = x.customer_id), 'site', (select to_jsonb(s) from dr.sites s where s.id = x.site_id)) order by x.time nulls last, x.created_at), '[]')
                 from dr.tasks x where x.date = d and x.status <> 'cancelled' and (boss or me.id = any(x.assignees))),
       'reports', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('photos', dr.photo_json(x.photo_ids)) order by x.created_at), '[]')
                 from dr.reports x where x.date = d and (boss or x.user_id = me.id)),
@@ -99,7 +99,7 @@ begin
   elsif p_action = 'range' then
     d2 := coalesce(nullif(p->>'to', '')::date, d + 6);
     return jsonb_build_object(
-      'tasks', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('customer_name', (select c.name from dr.customers c where c.id = x.customer_id), 'area', (select c.area from dr.customers c where c.id = x.customer_id)) order by x.date, x.time nulls last), '[]')
+      'tasks', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('customer_name', (select c.name from dr.customers c where c.id = x.customer_id), 'site_label', (select s.label from dr.sites s where s.id = x.site_id), 'area', coalesce((select s.area from dr.sites s where s.id = x.site_id), (select c.area from dr.customers c where c.id = x.customer_id))) order by x.date, x.time nulls last), '[]')
                 from dr.tasks x where x.date between d and d2 and x.status <> 'cancelled' and (boss or me.id = any(x.assignees))),
       'reports', (select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'user_id', x.user_id, 'date', x.date, 'task_id', x.task_id, 'start_time', x.start_time, 'end_time', x.end_time, 'n_photos', cardinality(x.photo_ids), 'site', x.site, 'work', x.work)), '[]')
                 from dr.reports x where x.date between d and d2 and (boss or x.user_id = me.id)),
@@ -109,7 +109,7 @@ begin
 
   -- ---------- customers & sites ----------
   elsif p_action = 'customers' then
-    return (select coalesce(jsonb_agg(to_jsonb(c) order by c.name), '[]') from dr.customers c
+    return (select coalesce(jsonb_agg(to_jsonb(c) || jsonb_build_object('sites', (select coalesce(jsonb_agg(to_jsonb(s) order by s.created_at), '[]') from dr.sites s where s.customer_id = c.id and s.active)) order by c.name), '[]') from dr.customers c
             where boss or exists (select 1 from dr.tasks x where x.customer_id = c.id and me.id = any(x.assignees)));
 
   elsif p_action = 'customer_get' then
@@ -117,38 +117,55 @@ begin
     if not boss and not exists (select 1 from dr.tasks x where x.customer_id = rid and me.id = any(x.assignees)) then return '{"error":"forbidden"}'; end if;
     return jsonb_build_object(
       'customer', (select to_jsonb(c) from dr.customers c where c.id = rid),
-      'tasks', (select coalesce(jsonb_agg(to_jsonb(x) order by x.date desc), '[]') from (select * from dr.tasks where customer_id = rid order by date desc limit 60) x),
+      'sites', (select coalesce(jsonb_agg(to_jsonb(s) order by s.active desc, s.created_at), '[]') from dr.sites s where s.customer_id = rid),
+      'tasks', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('site_label', (select s.label from dr.sites s where s.id = x.site_id)) order by x.date desc), '[]') from (select * from dr.tasks where customer_id = rid order by date desc limit 60) x),
       'reports', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('photos', dr.photo_json(x.photo_ids)) order by x.date desc), '[]')
                   from (select * from dr.reports where customer_id = rid or task_id in (select id from dr.tasks where customer_id = rid) order by date desc limit 60) x),
-      'plans', (select coalesce(jsonb_agg(to_jsonb(x)), '[]') from dr.plans x where x.customer_id = rid));
+      'plans', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('site_label', (select s.label from dr.sites s where s.id = x.site_id))), '[]') from dr.plans x where x.customer_id = rid));
 
   elsif p_action = 'customer_save' then
     if not boss then return '{"error":"forbidden"}'; end if;
     if coalesce(trim(p->>'name'), '') = '' then return '{"error":"bad","msg":"اسم الزبون مطلوب"}'; end if;
     rid := nullif(p->>'id', '')::uuid;
     if rid is null then
-      insert into dr.customers(name, phone, area, address, lat, lng, map_url, notes, platform_name, created_by)
-      values (trim(p->>'name'), p->>'phone', p->>'area', p->>'address', nullif(p->>'lat', '')::float8, nullif(p->>'lng', '')::float8, p->>'map_url', p->>'notes', nullif(p->>'platform_name', ''), me.id)
+      insert into dr.customers(name, phone, notes, platform_name, created_by)
+      values (trim(p->>'name'), p->>'phone', p->>'notes', nullif(p->>'platform_name', ''), me.id)
       returning id into rid;
     else
-      update dr.customers set name = trim(p->>'name'), phone = p->>'phone', area = p->>'area', address = p->>'address',
-        lat = nullif(p->>'lat', '')::float8, lng = nullif(p->>'lng', '')::float8, map_url = p->>'map_url', notes = p->>'notes',
+      update dr.customers set name = trim(p->>'name'), phone = p->>'phone', notes = p->>'notes',
         platform_name = nullif(p->>'platform_name', ''), updated_at = now() where id = rid;
     end if;
     return jsonb_build_object('ok', true, 'id', rid);
 
-  -- ---------- tasks ----------
+  elsif p_action = 'site_save' then
+    if not boss then return '{"error":"forbidden"}'; end if;
+    if coalesce(trim(p->>'label'), '') = '' then return '{"error":"bad","msg":"اسم الموقع مطلوب (مثلاً: البيت، الورشة، المحطة)"}'; end if;
+    rid := nullif(p->>'id', '')::uuid;
+    if rid is null then
+      if not exists (select 1 from dr.customers where id = nullif(p->>'customer_id', '')::uuid) then return '{"error":"bad","msg":"اختر الزبون"}'; end if;
+      insert into dr.sites(customer_id, label, area, address, lat, lng, map_url, deye_id, platform_name, notes)
+      values ((p->>'customer_id')::uuid, trim(p->>'label'), p->>'area', p->>'address', nullif(p->>'lat', '')::float8, nullif(p->>'lng', '')::float8,
+              nullif(p->>'map_url', ''), nullif(p->>'deye_id', '')::bigint, nullif(p->>'platform_name', ''), p->>'notes')
+      returning id into rid;
+    else
+      update dr.sites set label = trim(p->>'label'), area = p->>'area', address = p->>'address',
+        lat = nullif(p->>'lat', '')::float8, lng = nullif(p->>'lng', '')::float8, map_url = nullif(p->>'map_url', ''),
+        deye_id = nullif(p->>'deye_id', '')::bigint, platform_name = nullif(p->>'platform_name', ''), notes = p->>'notes',
+        active = coalesce((p->>'active')::boolean, true), updated_at = now() where id = rid;
+    end if;
+    return jsonb_build_object('ok', true, 'id', rid);
+
   elsif p_action = 'task_save' then
     if not boss then return '{"error":"forbidden"}'; end if;
     if coalesce(trim(p->>'title'), '') = '' then return '{"error":"bad","msg":"اكتب شو المهمة"}'; end if;
     select coalesce(array_agg(value::uuid), '{}') into ids from jsonb_array_elements_text(coalesce(p->'assignees', '[]'));
     rid := nullif(p->>'id', '')::uuid;
     if rid is null then
-      insert into dr.tasks(date, time, customer_id, title, kind, details, assignees, priority, created_by)
-      values (d, nullif(p->>'time', ''), nullif(p->>'customer_id', '')::uuid, trim(p->>'title'), coalesce(nullif(p->>'kind', ''), 'work'),
+      insert into dr.tasks(date, time, customer_id, site_id, title, kind, details, assignees, priority, created_by)
+      values (d, nullif(p->>'time', ''), coalesce((select customer_id from dr.sites where id = nullif(p->>'site_id', '')::uuid), nullif(p->>'customer_id', '')::uuid), nullif(p->>'site_id', '')::uuid, trim(p->>'title'), coalesce(nullif(p->>'kind', ''), 'work'),
               p->>'details', ids, coalesce(nullif(p->>'priority', ''), 'normal'), me.id) returning id into rid;
     else
-      update dr.tasks set date = d, time = nullif(p->>'time', ''), customer_id = nullif(p->>'customer_id', '')::uuid, title = trim(p->>'title'),
+      update dr.tasks set date = d, time = nullif(p->>'time', ''), customer_id = coalesce((select customer_id from dr.sites where id = nullif(p->>'site_id', '')::uuid), nullif(p->>'customer_id', '')::uuid), site_id = nullif(p->>'site_id', '')::uuid, title = trim(p->>'title'),
         kind = coalesce(nullif(p->>'kind', ''), 'work'), details = p->>'details', assignees = ids,
         priority = coalesce(nullif(p->>'priority', ''), 'normal'), updated_at = now() where id = rid;
     end if;
@@ -191,13 +208,15 @@ begin
     if not boss and d < (now() at time zone 'Asia/Beirut')::date - 1 then return '{"error":"bad","msg":"التقرير بينكتب نفس النهار أو تاني يوم بس"}'; end if;
     rid := nullif(p->>'id', '')::uuid;
     if rid is null then
-      insert into dr.reports(user_id, date, task_id, customer_id, site, start_time, end_time, work, photo_ids)
+      insert into dr.reports(user_id, date, task_id, customer_id, site_id, site, start_time, end_time, work, photo_ids)
       values (me.id, d, nullif(p->>'task_id', '')::uuid,
         coalesce(nullif(p->>'customer_id', '')::uuid, (select customer_id from dr.tasks where id = nullif(p->>'task_id', '')::uuid)),
+        coalesce(nullif(p->>'site_id', '')::uuid, (select site_id from dr.tasks where id = nullif(p->>'task_id', '')::uuid)),
         p->>'site', p->>'start_time', p->>'end_time', trim(p->>'work'), ids) returning id into rid;
     else
       update dr.reports set task_id = nullif(p->>'task_id', '')::uuid,
         customer_id = coalesce(nullif(p->>'customer_id', '')::uuid, (select customer_id from dr.tasks where id = nullif(p->>'task_id', '')::uuid)),
+        site_id = coalesce(nullif(p->>'site_id', '')::uuid, (select site_id from dr.tasks where id = nullif(p->>'task_id', '')::uuid)),
         site = p->>'site', start_time = p->>'start_time', end_time = p->>'end_time', work = trim(p->>'work'), photo_ids = ids, updated_at = now()
       where id = rid and user_id = me.id;
     end if;
@@ -209,10 +228,10 @@ begin
     if cardinality(ids) = 0 then return '{"error":"photos","msg":"بلا صورة فاتورة ما في صرف"}'; end if;
     if length(trim(coalesce(p->>'source', ''))) < 2 then return '{"error":"bad","msg":"اكتب المصدر (المحل أو المحطة)"}'; end if;
     if coalesce(nullif(p->>'amount', '')::numeric, 0) <= 0 then return '{"error":"bad","msg":"اكتب المبلغ"}'; end if;
-    insert into dr.expenses(user_id, date, kind, item, qty, amount, currency, source, paid_by, vehicle, customer_id, site, photo_ids)
+    insert into dr.expenses(user_id, date, kind, item, qty, amount, currency, source, paid_by, vehicle, customer_id, site_id, site, photo_ids)
     values (me.id, d, p->>'kind', coalesce(nullif(trim(p->>'item'), ''), case when p->>'kind' = 'fuel' then 'محروقات' else 'بضاعة' end),
       p->>'qty', (p->>'amount')::numeric, coalesce(nullif(p->>'currency', ''), '$'), trim(p->>'source'),
-      coalesce(nullif(p->>'paid_by', ''), me.name), p->>'vehicle', nullif(p->>'customer_id', '')::uuid, p->>'site', ids)
+      coalesce(nullif(p->>'paid_by', ''), me.name), p->>'vehicle', coalesce((select customer_id from dr.sites where id = nullif(p->>'site_id', '')::uuid), nullif(p->>'customer_id', '')::uuid), nullif(p->>'site_id', '')::uuid, p->>'site', ids)
     returning id into rid;
     return jsonb_build_object('ok', true, 'id', rid);
 
@@ -241,6 +260,10 @@ begin
     elsif v = 'payment' then delete from dr.payments where id = rid and (adm or (user_id = me.id and status = 'pending'));
     elsif v = 'task' and boss then delete from dr.tasks where id = rid;
     elsif v = 'plan' and boss then delete from dr.plans where id = rid;
+    elsif v = 'site' and adm then
+      if exists (select 1 from dr.tasks where site_id = rid) or exists (select 1 from dr.reports where site_id = rid) then
+        update dr.sites set active = false, updated_at = now() where id = rid;
+      else delete from dr.sites where id = rid; end if;
     else return '{"error":"forbidden"}'; end if;
     return '{"ok":true}';
 
@@ -262,18 +285,18 @@ begin
   -- ---------- maintenance plans ----------
   elsif p_action = 'plans' then
     if not boss then return '{"error":"forbidden"}'; end if;
-    return (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('customer_name', (select name from dr.customers c where c.id = x.customer_id)) order by x.next_date), '[]') from dr.plans x);
+    return (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('customer_name', (select name from dr.customers c where c.id = x.customer_id), 'site_label', (select s.label from dr.sites s where s.id = x.site_id)) order by x.next_date), '[]') from dr.plans x);
 
   elsif p_action = 'plan_save' then
     if not boss then return '{"error":"forbidden"}'; end if;
     select coalesce(array_agg(value::uuid), '{}') into ids from jsonb_array_elements_text(coalesce(p->'assignees', '[]'));
     rid := nullif(p->>'id', '')::uuid;
     if rid is null then
-      insert into dr.plans(customer_id, title, kind, every_days, next_date, assignees, notes, active)
-      values ((p->>'customer_id')::uuid, trim(p->>'title'), coalesce(nullif(p->>'kind', ''), 'maintenance'), (p->>'every_days')::int,
+      insert into dr.plans(customer_id, site_id, title, kind, every_days, next_date, assignees, notes, active)
+      values ((p->>'customer_id')::uuid, nullif(p->>'site_id', '')::uuid, trim(p->>'title'), coalesce(nullif(p->>'kind', ''), 'maintenance'), (p->>'every_days')::int,
               (p->>'next_date')::date, ids, p->>'notes', coalesce((p->>'active')::boolean, true)) returning id into rid;
     else
-      update dr.plans set customer_id = (p->>'customer_id')::uuid, title = trim(p->>'title'), every_days = (p->>'every_days')::int,
+      update dr.plans set customer_id = (p->>'customer_id')::uuid, site_id = nullif(p->>'site_id', '')::uuid, title = trim(p->>'title'), every_days = (p->>'every_days')::int,
         next_date = (p->>'next_date')::date, assignees = ids, notes = p->>'notes', active = coalesce((p->>'active')::boolean, true) where id = rid;
     end if;
     perform dr.gen_plans();
@@ -292,7 +315,7 @@ begin
     if not adm then return '{"error":"forbidden"}'; end if;
     return jsonb_build_object(
       'expenses', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('user_name', (select name from dr.users u where u.id = x.user_id),
-                     'customer_name', (select name from dr.customers c where c.id = x.customer_id), 'photos', dr.photo_json(x.photo_ids)) order by x.date desc, x.created_at desc), '[]')
+                     'customer_name', (select name from dr.customers c where c.id = x.customer_id), 'site_label', (select s.label from dr.sites s where s.id = x.site_id), 'photos', dr.photo_json(x.photo_ids)) order by x.date desc, x.created_at desc), '[]')
                    from dr.expenses x where x.status = 'pending' or x.date >= current_date - 7),
       'payments', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('user_name', (select name from dr.users u where u.id = x.user_id), 'photos', dr.photo_json(x.photo_ids)) order by x.date desc, x.created_at desc), '[]')
                    from dr.payments x where x.status = 'pending' or x.date >= current_date - 7));
@@ -359,12 +382,12 @@ begin
                  'sheet_paths', (select coalesce(jsonb_agg(ph.path), '[]') from dr.photos ph where ph.id = any(x.sheet_photo_ids)))), '[]')
                from dr.daylogs x where x.closed and x.synced_at is null),
     'reports', (select coalesce(jsonb_agg(jsonb_build_object('date', r.date, 'worker', u.platform_name, 'user', u.name, 'start', r.start_time, 'end', r.end_time,
-                 'site', coalesce(c.platform_name, c.name, r.site), 'work', r.work, 'photos', cardinality(r.photo_ids))), '[]')
-               from dr.reports r join dr.users u on u.id = r.user_id left join dr.customers c on c.id = r.customer_id
+                 'site', coalesce(st.platform_name, c.platform_name, c.name, r.site), 'work', r.work, 'photos', cardinality(r.photo_ids))), '[]')
+               from dr.reports r join dr.users u on u.id = r.user_id left join dr.customers c on c.id = r.customer_id left join dr.sites st on st.id = r.site_id
                where r.date >= current_date - 21),
     'expenses', (select coalesce(jsonb_agg(jsonb_build_object('id', e.id, 'date', e.date, 'user', u.name, 'kind', e.kind, 'item', e.item, 'amount', e.amount,
-                 'currency', e.currency, 'source', e.source, 'status', e.status, 'site', coalesce(c.platform_name, c.name, e.site))), '[]')
-               from dr.expenses e join dr.users u on u.id = e.user_id left join dr.customers c on c.id = e.customer_id
+                 'currency', e.currency, 'source', e.source, 'status', e.status, 'site', coalesce(st.platform_name, c.platform_name, c.name, e.site))), '[]')
+               from dr.expenses e join dr.users u on u.id = e.user_id left join dr.customers c on c.id = e.customer_id left join dr.sites st on st.id = e.site_id
                where e.date >= current_date - 21));
   insert into dr.sync_log(info) values (jsonb_build_object('balances', (select count(*) from jsonb_object_keys(coalesce(p->'balances', '{}'))),
     'days', (select count(*) from jsonb_object_keys(coalesce(p->'days', '{}'))), 'daylogs', jsonb_array_length(out->'daylogs')));

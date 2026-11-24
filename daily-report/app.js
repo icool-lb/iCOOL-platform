@@ -36,6 +36,10 @@ function mapLink(c) {
   if (c.map_url) return c.map_url;
   return null;
 }
+function sitesOf(c) { return (c && c.sites) || []; }
+function siteMap(c) { var l = sitesOf(c); for (var i = 0; i < l.length; i++) if (mapLink(l[i])) return mapLink(l[i]); return mapLink(c); }
+function custAreas(c) { var a = []; sitesOf(c).forEach(function (s) { var x = s.area || ""; if (x && a.indexOf(x) < 0) a.push(x); }); return a.length ? a.join("، ") : (c.area || ""); }
+function siteText(s) { return s ? s.label + (s.area && s.area !== s.label ? " (" + s.area + ")" : "") : ""; }
 function telLink(p) { return p ? "tel:" + String(p).replace(/[^\d+]/g, "") : null; }
 function waNumber(p) {
   var d = String(p || "").replace(/\D/g, "");
@@ -218,10 +222,10 @@ function taskCard(t, opts) {
   var mine = S.me && t.assignees && t.assignees.indexOf(S.me.id) >= 0;
   var reps = (S.day && S.day.reports || []).filter(function (r) { return r.task_id === t.id; });
   var myRep = reps.filter(function (r) { return r.user_id === S.me.id && r.photo_ids && r.photo_ids.length; }).length > 0;
-  var ml = mapLink(c), tl = telLink(c && c.phone);
+  var sv = t.site || null, ml = mapLink(sv) || (sv ? null : mapLink(c)), tl = telLink(c && c.phone);
   var h = '<div class="task st-' + t.status + (t.priority === "urgent" ? " urgent" : "") + '"><div class="rail"></div><div class="task-b">';
   h += '<div class="task-h"><div class="grow"><div class="task-t">' + esc(t.title) + "</div>";
-  if (c) h += '<div class="task-c">' + esc(c.name) + (c.area ? " — " + esc(c.area) : "") + "</div>";
+  if (c) h += '<div class="task-c">' + esc(c.name) + (sv ? " — " + esc(siteText(sv)) : (c.area ? " — " + esc(c.area) : "")) + "</div>";
   h += "</div>" + (t.time ? '<span class="chip mono">' + esc(t.time) + "</span>" : "") + "</div>";
   if (t.details) h += '<div class="small" style="margin-top:4px;white-space:pre-wrap">' + esc(t.details) + "</div>";
   h += '<div class="chips"><span class="chip ' + st[1] + '">' + st[0] + '</span><span class="chip">' + esc(KIND[t.kind] || t.kind) + "</span>" + (t.priority === "urgent" ? '<span class="chip or">مستعجل</span>' : "") +
@@ -372,7 +376,7 @@ function vPlan(app) {
       h += '<div class="card tight">' + ts.map(function (t) {
         var st = ST[t.status] || ST.planned;
         return '<div class="li" data-act="taskEdit" data-id="' + t.id + '" style="cursor:pointer"><div class="m"><div class="t">' + (t.priority === "urgent" ? "🔴 " : "") + esc(t.title) + '</div><div class="tiny muted">' +
-          esc(t.customer_name || "") + (t.area ? " — " + esc(t.area) : "") + (t.time ? " · " + esc(t.time) : "") + '</div><div class="chips">' +
+          esc(t.customer_name || "") + (t.site_label ? " — " + esc(t.site_label) : "") + (t.area && t.area !== t.site_label ? " (" + esc(t.area) + ")" : "") + (t.time ? " · " + esc(t.time) : "") + '</div><div class="chips">' +
           (t.assignees || []).map(function (id) { return '<span class="chip blue">' + esc(uname(id)) + "</span>"; }).join("") + (t.assignees.length ? "" : '<span class="chip bad">بلا عامل</span>') +
           '</div></div><span class="chip ' + st[1] + '">' + st[0] + "</span></div>";
       }).join("") + "</div>";
@@ -396,7 +400,7 @@ function vCustomers(app) {
     var due = plans.filter(function (p) { return p.active && p.next_date <= addDays(S.today, 30); });
     if (due.length) {
       h += '<h2>صيانات دورية قريبة</h2><div class="card">' + due.map(function (p) {
-        return '<div class="li"><div class="m"><div class="t">' + esc(p.title) + '</div><div class="tiny muted">' + esc(p.customer_name || "") + " · كل " + p.every_days + ' يوم</div></div><span class="chip ' + (p.next_date <= S.today ? "or" : "warn") + '">' + dShort(p.next_date) + "</span></div>";
+        return '<div class="li"><div class="m"><div class="t">' + esc(p.title) + '</div><div class="tiny muted">' + esc(p.customer_name || "") + (p.site_label ? " — " + esc(p.site_label) : "") + " · كل " + p.every_days + ' يوم</div></div><span class="chip ' + (p.next_date <= S.today ? "or" : "warn") + '">' + dShort(p.next_date) + "</span></div>";
       }).join("") + "</div>";
     }
     h += '<h2>الزبائن <span class="muted small">(' + list.length + ')</span></h2><div class="card" id="clist">' + custRows(list, q) + "</div>";
@@ -406,11 +410,11 @@ function vCustomers(app) {
 }
 function custRows(list, q) {
   var n = normName(q);
-  var l = list.filter(function (c) { return !n || normName(c.name + " " + (c.area || "") + " " + (c.phone || "")).indexOf(n) >= 0; });
+  var l = list.filter(function (c) { return !n || normName(c.name + " " + custAreas(c) + " " + sitesOf(c).map(function (s) { return s.label; }).join(" ") + " " + (c.phone || "")).indexOf(n) >= 0; });
   if (!l.length) return '<div class="empty">' + (list.length ? "ما في نتيجة" : "<b>ما في زبائن بعد</b>زيد الزبون مع موقعه (رابط خريطة أو GPS) — بيطلع للعامل زر «الموقع».") + "</div>";
   return l.map(function (c) {
     return '<div class="li" data-act="custOpen" data-id="' + c.id + '" style="cursor:pointer"><span class="av">' + esc(initials(c.name)) + '</span><div class="m"><div class="t">' + esc(c.name) + '</div><div class="tiny muted">' +
-      esc(c.area || "") + (c.phone ? " · " + esc(c.phone) : "") + "</div></div>" + (mapLink(c) ? '<span class="chip ok">📍</span>' : '<span class="chip warn">بلا موقع</span>') + "</div>";
+      esc(custAreas(c)) + (sitesOf(c).length > 1 ? " · " + sitesOf(c).length + " مواقع" : "") + (c.phone ? " · " + esc(c.phone) : "") + "</div></div>" + (siteMap(c) ? '<span class="chip ok">📍</span>' : '<span class="chip warn">بلا موقع</span>') + "</div>";
   }).join("");
 }
 
@@ -472,10 +476,16 @@ function otOf(w) {
   var ot = (b - a) / 60 - 9;
   return Math.round(ot * 4) / 4;
 }
+function siteNames(c) {
+  var out = [], seen = {};
+  function add(n) { n = String(n || "").trim(); if (n && !seen[n]) { seen[n] = 1; out.push(n); } }
+  c.forEach(function (x) { add(x.platform_name || x.name); sitesOf(x).forEach(function (s) { if (s.platform_name) add(s.platform_name); }); });
+  return out;
+}
 function datalists() {
   var c = S.cache.customers || [];
   return '<datalist id="dl_people">' + field().map(function (u) { return '<option value="' + esc(u.platform_name || u.name) + '">'; }).join("") + '<option value="شغيل (مياوم)"></datalist>' +
-    '<datalist id="dl_sites">' + c.map(function (x) { return '<option value="' + esc(x.platform_name || x.name) + '">'; }).join("") + "</datalist>" +
+    '<datalist id="dl_sites">' + siteNames(c).map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>" +
     '<datalist id="dl_src"><option value="iCOOL"><option value="مشتريات نقدية"><option value="حسن عيد"><option value="صالح"><option value="معتوق ستيل (خليل معتوق)"><option value="خزعل ستيل"><option value="ابراهيم طيراني"></datalist>';
 }
 
@@ -629,7 +639,7 @@ function openReport(taskId, repId) {
   var hr = beirutHour();
   S.form = { _type: "report", id: r ? r.id : "", photos: r ? (r.photos || []) : [] };
   var h = sheetHead(r ? "تعديل التقرير" : "تقرير الشغل") + '<div class="tiny muted">' + esc(dLabel(S.date)) + "</div>";
-  h += '<label class="f"><span>المهمة</span><select id="r_task"><option value="">— شغل بلا مهمة —</option>' + mine.map(function (t) { return '<option value="' + t.id + '"' + (t.id === t0 ? " selected" : "") + ">" + esc(t.title + (t.customer ? " — " + t.customer.name : "")) + "</option>"; }).join("") + "</select></label>";
+  h += '<label class="f"><span>المهمة</span><select id="r_task"><option value="">— شغل بلا مهمة —</option>' + mine.map(function (t) { return '<option value="' + t.id + '"' + (t.id === t0 ? " selected" : "") + ">" + esc(t.title + (t.customer ? " — " + t.customer.name : "") + (t.site ? " · " + t.site.label : "")) + "</option>"; }).join("") + "</select></label>";
   h += '<label class="f" id="r_site_w"' + (t0 ? " hidden" : "") + '><span>الموقع / الزبون</span><input id="r_site" list="dl_sites" value="' + esc(r ? r.site : "") + '" placeholder="وين اشتغلت؟"></label>';
   h += '<div class="f2"><label class="f"><span>بلّشت</span><input id="r_start" type="time" value="' + esc(r ? r.start_time : "08:00") + '"></label><label class="f"><span>خلّصت</span><input id="r_end" type="time" value="' + esc(r ? r.end_time : (hr >= 12 && hr <= 19 ? String(hr).padStart(2, "0") + ":00" : "17:00")) + '"></label></div>';
   h += '<label class="f"><span>شو خلّصت بالتفصيل <b class="req">*</b></span><textarea id="r_work" placeholder="مثلاً: تركيب 2 مكيف 12000 بالصالون وغرفة النوم، تمديد نحاس 8 متر، تجربة وتشغيل">' + esc(r ? r.work : "") + "</textarea></label>";
@@ -709,7 +719,8 @@ function openTask(id, date) {
     var people = field();
     var h = sheetHead(t ? "تعديل المهمة" : "مهمة جديدة");
     h += '<label class="f"><span>شو المهمة <b class="req">*</b></span><input id="t_title" value="' + esc(t ? t.title : "") + '" placeholder="مثلاً: تركيب مكيفين 12000"></label>';
-    h += '<label class="f"><span>الزبون / الموقع</span><select id="t_cust"><option value="">— اختر —</option>' + cs.map(function (c) { return '<option value="' + c.id + '"' + (t && t.customer_id === c.id ? " selected" : "") + ">" + esc(c.name + (c.area ? " — " + c.area : "")) + "</option>"; }).join("") + '</select></label><button class="btn sm ghost" data-act="custNew" data-back="task">+ زبون جديد</button>';
+    h += '<label class="f"><span>الزبون</span><select id="t_cust"><option value="">— اختر —</option>' + cs.map(function (c) { return '<option value="' + c.id + '"' + (t && t.customer_id === c.id ? " selected" : "") + ">" + esc(c.name + (custAreas(c) ? " — " + custAreas(c) : "")) + "</option>"; }).join("") + '</select></label>';
+    h += '<label class="f" id="t_site_w"><span>الموقع</span><select id="t_site"></select></label><button class="btn sm ghost" data-act="custNew" data-back="task">+ زبون جديد</button>';
     h += '<div class="f2"><label class="f"><span>اليوم</span><input id="t_date" type="date" value="' + esc(t ? t.date : (date || S.date || S.today)) + '"></label><label class="f"><span>الساعة</span><input id="t_time" type="time" value="' + esc(t ? t.time || "" : "") + '"></label></div>';
     h += '<label class="f"><span>النوع</span><select id="t_kind">' + Object.keys(KIND).map(function (k) { return '<option value="' + k + '"' + ((t ? t.kind : "work") === k ? " selected" : "") + ">" + KIND[k] + "</option>"; }).join("") + "</select></label>";
     h += '<div class="f"><span>مين رايح</span><div class="pick">' + people.map(function (u) { return '<label><input type="checkbox" name="t_as" value="' + u.id + '"' + (t && t.assignees.indexOf(u.id) >= 0 ? " checked" : "") + "><span>" + esc(u.name) + "</span></label>"; }).join("") + "</div></div>";
@@ -717,13 +728,23 @@ function openTask(id, date) {
     h += '<div class="pick" style="margin-top:10px"><label><input type="checkbox" id="t_urgent"' + (t && t.priority === "urgent" ? " checked" : "") + "><span>🔴 مستعجل</span></label></div>";
     h += '<div class="sheet-f">' + (t ? '<button class="btn danger" data-act="delItem" data-t="task" data-id="' + t.id + '">حذف</button>' : "") + '<button class="btn pri" data-act="taskSave">حفظ</button></div>';
     sheet(h);
+    fillSiteSelect("t_cust", "t_site", t ? t.site_id : (S.form.preSite || ""));
+    $("#t_cust").addEventListener("change", function () { fillSiteSelect("t_cust", "t_site", ""); });
   }, fail);
+}
+/* the site picker follows the chosen customer: one site → picked; several → choose */
+function fillSiteSelect(custSel, siteSel, cur) {
+  var cid = val(custSel), c = (S.cache.customers || []).filter(function (x) { return x.id === cid; })[0];
+  var l = sitesOf(c), el = document.getElementById(siteSel); if (!el) return;
+  el.innerHTML = (l.length === 1 ? "" : '<option value="">' + (cid ? (l.length ? "— اختر الموقع —" : "— ما في مواقع، زيد من صفحة الزبون —") : "— اختر الزبون أول —") + "</option>") +
+    l.map(function (s) { return '<option value="' + s.id + '"' + (s.id === cur ? " selected" : "") + ">" + esc(siteText(s)) + (mapLink(s) ? " 📍" : "") + "</option>"; }).join("");
+  if (el.parentNode) el.parentNode.hidden = !cid;
 }
 function saveTask(btn) {
   if (!val("t_title")) return toast("اكتب شو المهمة");
   var as = Array.prototype.map.call(document.querySelectorAll('input[name="t_as"]:checked'), function (x) { return x.value; });
   btn.disabled = true;
-  api("task_save", { id: S.form.id, title: val("t_title"), customer_id: val("t_cust"), date: val("t_date"), time: val("t_time"), kind: val("t_kind"), assignees: as, details: val("t_details"), priority: $("#t_urgent").checked ? "urgent" : "normal" })
+  api("task_save", { id: S.form.id, title: val("t_title"), customer_id: val("t_cust"), site_id: val("t_site"), date: val("t_date"), time: val("t_time"), kind: val("t_kind"), assignees: as, details: val("t_details"), priority: $("#t_urgent").checked ? "urgent" : "normal" })
     .then(function () { closeSheet(); toast("انحفظت ✓"); render(); }, function (e) { btn.disabled = false; fail(e); });
 }
 
@@ -732,37 +753,81 @@ function openCustomer(id, back) {
   var c = id ? (S.cache.customers || []).filter(function (x) { return x.id === id; })[0] : null;
   S.form = { _type: "cust", id: id || "", back: back || "" };
   var h = sheetHead(c ? "تعديل الزبون" : "زبون جديد");
-  h += '<label class="f"><span>الاسم <b class="req">*</b></span><input id="c_name" value="' + esc(c ? c.name : "") + '"></label>';
-  h += '<div class="f2"><label class="f"><span>التلفون</span><input id="c_phone" inputmode="tel" value="' + esc(c ? c.phone || "" : "") + '"></label><label class="f"><span>المنطقة</span><input id="c_area" value="' + esc(c ? c.area || "" : "") + '"></label></div>';
-  h += '<label class="f"><span>رابط الموقع (Google Maps) أو إحداثيات</span><input id="c_map" value="' + esc(c ? (c.map_url || (c.lat != null ? c.lat + "," + c.lng : "")) : "") + '" placeholder="الصق رابط الموقع من واتساب"></label>';
-  h += '<div class="acts"><button class="btn sm" data-act="gps">📍 موقعي الحالي (إذا إنت بالموقع)</button></div><div class="tiny muted" id="c_gps"></div>';
-  h += '<label class="f"><span>العنوان / ملاحظات الوصول</span><input id="c_addr" value="' + esc(c ? c.address || "" : "") + '"></label>';
+  h += '<label class="f"><span>اسم الزبون <b class="req">*</b></span><input id="c_name" value="' + esc(c ? c.name : "") + '"></label>';
+  h += '<label class="f"><span>التلفون</span><input id="c_phone" inputmode="tel" value="' + esc(c ? c.phone || "" : "") + '"></label>';
+  if (!c) {
+    h += '<div class="banner info">الاسم ثابت، والمواقع بتتغيّر: زيد هون أول موقع، وبعدين بتزيد مواقع تانية من صفحة الزبون.</div>';
+    h += siteFields(null);
+  }
   h += '<label class="f"><span>الاسم بمنصة اليوميات (للربط بالحسابات)</span><input id="c_pname" list="dl_sites" value="' + esc(c ? c.platform_name || "" : "") + '"></label>';
   h += '<label class="f"><span>ملاحظات</span><textarea id="c_notes">' + esc(c ? c.notes || "" : "") + "</textarea></label>";
   h += '<div class="sheet-f"><button class="btn pri" data-act="custSave">حفظ</button></div>' + datalists();
   sheet(h);
 }
+function siteFields(s) {
+  var h = '<div class="f2"><label class="f"><span>اسم الموقع <b class="req">*</b></span><input id="s_label" value="' + esc(s ? s.label : "") + '" placeholder="البيت، الورشة، المحطة…"></label><label class="f"><span>المنطقة</span><input id="s_area" value="' + esc(s ? s.area || "" : "") + '"></label></div>';
+  h += '<label class="f"><span>رابط الموقع (Google Maps) أو إحداثيات</span><input id="c_map" value="' + esc(s ? (s.map_url || (s.lat != null ? s.lat + "," + s.lng : "")) : "") + '" placeholder="الصق رابط الموقع من واتساب"></label>';
+  h += '<div class="acts"><button class="btn sm" data-act="gps">📍 موقعي الحالي (إذا إنت بالموقع)</button></div><div class="tiny muted" id="c_gps"></div>';
+  h += '<label class="f"><span>العنوان / ملاحظات الوصول</span><input id="s_addr" value="' + esc(s ? s.address || "" : "") + '"></label>';
+  return h;
+}
+function siteBody(extra) {
+  var m = val("c_map"), co = parseCoords(m);
+  return Object.assign({ label: val("s_label"), area: val("s_area"), address: val("s_addr"), map_url: co && !/^https?:/.test(m) ? "" : m,
+    lat: co ? co.lat : (S.form.lat || ""), lng: co ? co.lng : (S.form.lng || "") }, extra || {});
+}
 function saveCustomer(btn) {
   if (!val("c_name")) return toast("اكتب اسم الزبون");
-  var m = val("c_map"), co = parseCoords(m);
+  var isNew = !S.form.id;
+  if (isNew && !val("s_label") && (val("s_area") || val("c_map") || val("s_addr"))) return toast("اكتب اسم الموقع (مثلاً: البيت)");
   btn.disabled = true;
-  var back = S.form.back;
-  api("customer_save", { id: S.form.id, name: val("c_name"), phone: val("c_phone"), area: val("c_area"), address: val("c_addr"), map_url: co && !/^https?:/.test(m) ? "" : m, lat: co ? co.lat : (S.form.lat || ""), lng: co ? co.lng : (S.form.lng || ""), platform_name: val("c_pname"), notes: val("c_notes") })
-    .then(function () { S.cache.customers = null; closeSheet(); toast("انحفظ ✓"); if (back === "task") openTask(null, S.date); else render(); }, function (e) { btn.disabled = false; fail(e); });
+  var back = S.form.back, site = isNew && val("s_label") ? siteBody() : null;
+  api("customer_save", { id: S.form.id, name: val("c_name"), phone: val("c_phone"), platform_name: val("c_pname"), notes: val("c_notes") })
+    .then(function (j) { return site ? api("site_save", Object.assign(site, { customer_id: j.id })).then(function () { return j; }) : j; })
+    .then(function (j) {
+      S.cache.customers = null; closeSheet(); toast("انحفظ ✓");
+      if (back === "task") openTask(null, S.date); else if (!isNew) openCustomerDetail(j.id); else render();
+    }, function (e) { btn.disabled = false; fail(e); });
+}
+function openSite(cid, sid) {
+  var s = sid ? (S.cache.custSites || []).filter(function (x) { return x.id === sid; })[0] : null;
+  S.form = { _type: "site", id: sid || "", cid: cid };
+  var h = sheetHead(s ? "تعديل الموقع" : "موقع جديد") + siteFields(s);
+  h += '<div class="f2"><label class="f"><span>اسمه بمنصة اليوميات</span><input id="s_pname" list="dl_sites" value="' + esc(s ? s.platform_name || "" : "") + '"></label><label class="f"><span>رقم نظام Deye</span><input id="s_deye" inputmode="numeric" value="' + esc(s ? s.deye_id || "" : "") + '"></label></div>';
+  h += '<label class="f"><span>ملاحظات الموقع (الأجهزة، المفاتيح…)</span><textarea id="s_notes">' + esc(s ? s.notes || "" : "") + "</textarea></label>";
+  if (s) h += '<div class="pick" style="margin-top:10px"><label><input type="checkbox" id="s_active"' + (s.active ? " checked" : "") + "><span>فعّال</span></label></div>";
+  h += '<div class="sheet-f">' + (s && isAdmin() ? '<button class="btn danger" data-act="delItem" data-t="site" data-id="' + s.id + '" data-c="' + cid + '">حذف</button>' : "") + '<button class="btn pri" data-act="siteSave">حفظ</button></div>' + datalists();
+  sheet(h);
+}
+function saveSite(btn) {
+  if (!val("s_label")) return toast("اكتب اسم الموقع");
+  btn.disabled = true;
+  var cid = S.form.cid;
+  api("site_save", siteBody({ id: S.form.id, customer_id: cid, platform_name: val("s_pname"), deye_id: val("s_deye"), notes: val("s_notes"), active: $("#s_active") ? $("#s_active").checked : true }))
+    .then(function () { S.cache.customers = null; toast("انحفظ ✓"); openCustomerDetail(cid); }, function (e) { btn.disabled = false; fail(e); });
 }
 function openCustomerDetail(id) {
   api("customer_get", { id: id }).then(function (d) {
-    var c = d.customer, ml = mapLink(c), tl = telLink(c.phone);
-    var h = sheetHead(c.name) + '<div class="small muted">' + esc(c.area || "") + (c.address ? " · " + esc(c.address) : "") + "</div>";
-    h += '<div class="acts">' + (ml ? '<a class="btn sm" href="' + esc(ml) + '" target="_blank" rel="noopener">📍 الموقع</a>' : '<span class="chip warn">بلا موقع</span>') + (tl ? '<a class="btn sm" href="' + esc(tl) + '">📞 ' + esc(c.phone) + "</a>" : "") +
-      (c.phone ? '<a class="btn sm" href="https://wa.me/' + waNumber(c.phone) + '" target="_blank" rel="noopener">واتساب</a>' : "") + '<button class="btn sm" data-act="custEdit" data-id="' + c.id + '">تعديل</button><button class="btn sm pri" data-act="taskForCust" data-id="' + c.id + '">+ مهمة</button></div>';
-    if (c.notes) h += '<div class="small" style="margin-top:8px;white-space:pre-wrap">' + esc(c.notes) + "</div>";
+    var c = d.customer, sites = d.sites || [], tl = telLink(c.phone);
+    S.cache.custSites = sites;
+    var h = sheetHead(c.name);
+    h += '<div class="acts">' + (tl ? '<a class="btn sm" href="' + esc(tl) + '">📞 ' + esc(c.phone) + "</a>" : "") +
+      (c.phone ? '<a class="btn sm" href="https://wa.me/' + waNumber(c.phone) + '" target="_blank" rel="noopener">واتساب</a>' : "") + (isBoss() ? '<button class="btn sm" data-act="custEdit" data-id="' + c.id + '">تعديل</button><button class="btn sm pri" data-act="taskForCust" data-id="' + c.id + '">+ مهمة</button>' : "") + "</div>";
+    if (c.notes) h += '<div class="small muted" style="margin-top:8px;white-space:pre-wrap">' + esc(c.notes) + "</div>";
+    h += '<div class="sec-h"><h3>المواقع <span class="muted small">(' + sites.filter(function (s) { return s.active; }).length + ')</span></h3>' + (isBoss() ? '<button class="btn sm" data-act="siteNew" data-c="' + c.id + '">+ موقع</button>' : "") + "</div>";
+    h += sites.map(function (s) {
+      var ml = mapLink(s);
+      return '<div class="li"' + (s.active ? "" : ' style="opacity:.5"') + '><div class="m"><div class="t">' + esc(s.label) + (s.active ? "" : " · موقّف") + '</div><div class="tiny muted">' + esc([s.area, s.address].filter(Boolean).join(" · ")) +
+        (s.deye_id ? " · Deye " + esc(s.deye_id) : "") + (s.notes ? " · " + esc(s.notes) : "") + "</div></div>" +
+        (ml ? '<a class="btn sm" href="' + esc(ml) + '" target="_blank" rel="noopener">📍</a>' : '<span class="chip warn">بلا موقع</span>') +
+        (isBoss() ? '<button class="btn sm" data-act="taskForCust" data-id="' + c.id + '" data-site="' + s.id + '">+ مهمة</button><button class="btn sm ghost" data-act="siteEdit" data-c="' + c.id + '" data-id="' + s.id + '">تعديل</button>' : "") + "</div>";
+    }).join("") || '<div class="tiny muted">ما في مواقع. زيد موقع (البيت، الورشة…) مع رابط الخريطة.</div>';
     h += '<div class="sec-h"><h3>صيانة دورية</h3><button class="btn sm" data-act="planNew" data-c="' + c.id + '">+</button></div>';
-    h += (d.plans || []).map(function (p) { return '<div class="li" data-act="planEdit" data-id="' + p.id + '" data-c="' + c.id + '" style="cursor:pointer"><div class="m"><div class="t">' + esc(p.title) + '</div><div class="tiny muted">كل ' + p.every_days + " يوم · الجاية " + dShort(p.next_date) + (p.active ? "" : " · موقّفة") + "</div></div><span>‹</span></div>"; }).join("") || '<div class="tiny muted">ما في. زيد صيانة (مثلاً مكيفات كل 180 يوم) وبتطلع مهمة لحالها.</div>';
+    h += (d.plans || []).map(function (p) { return '<div class="li" data-act="planEdit" data-id="' + p.id + '" data-c="' + c.id + '" style="cursor:pointer"><div class="m"><div class="t">' + esc(p.title) + '</div><div class="tiny muted">' + (p.site_label ? esc(p.site_label) + " · " : "") + "كل " + p.every_days + " يوم · الجاية " + dShort(p.next_date) + (p.active ? "" : " · موقّفة") + "</div></div><span>‹</span></div>"; }).join("") || '<div class="tiny muted">ما في. زيد صيانة (مثلاً مكيفات كل 180 يوم) وبتطلع مهمة لحالها.</div>';
     S.cache.custPlans = d.plans || [];
     h += "<h3>الشغل والصور</h3>";
-    h += (d.reports || []).map(function (r) { return '<div class="card tight" style="margin-top:8px"><div class="row between"><b class="small">' + esc(uname(r.user_id)) + '</b><span class="tiny muted">' + esc(dLabel(r.date)) + '</span></div><div class="small" style="white-space:pre-wrap">' + esc(r.work) + '</div><div class="thumbs">' + thumbs(r.photos) + "</div></div>"; }).join("") || '<div class="tiny muted">لسا ما في تقارير.</div>';
-    h += "<h3>المهام</h3>" + ((d.tasks || []).map(function (t) { var st = ST[t.status] || ST.planned; return '<div class="li"><div class="m"><div class="t small">' + esc(t.title) + '</div><div class="tiny muted">' + esc(dLabel(t.date)) + '</div></div><span class="chip ' + st[1] + '">' + st[0] + "</span></div>"; }).join("") || '<div class="tiny muted">ما في.</div>');
+    h += (d.reports || []).map(function (r) { var st = sites.filter(function (x) { return x.id === r.site_id; })[0]; return '<div class="card tight" style="margin-top:8px"><div class="row between"><b class="small">' + esc(uname(r.user_id)) + (st ? ' <span class="muted">· ' + esc(st.label) + "</span>" : "") + '</b><span class="tiny muted">' + esc(dLabel(r.date)) + '</span></div><div class="small" style="white-space:pre-wrap">' + esc(r.work) + '</div><div class="thumbs">' + thumbs(r.photos) + "</div></div>"; }).join("") || '<div class="tiny muted">لسا ما في تقارير.</div>';
+    h += "<h3>المهام</h3>" + ((d.tasks || []).map(function (t) { var st = ST[t.status] || ST.planned; return '<div class="li"><div class="m"><div class="t small">' + esc(t.title) + '</div><div class="tiny muted">' + esc(dLabel(t.date)) + (t.site_label ? " · " + esc(t.site_label) : "") + '</div></div><span class="chip ' + st[1] + '">' + st[0] + "</span></div>"; }).join("") || '<div class="tiny muted">ما في.</div>');
     sheet(h);
   }, fail);
 }
@@ -771,6 +836,8 @@ function openPlan(cid, pid) {
   S.form = { _type: "plan", id: pid || "", cid: cid };
   var h = sheetHead(p ? "تعديل الصيانة الدورية" : "صيانة دورية");
   h += '<label class="f"><span>شو الصيانة <b class="req">*</b></span><input id="pl_title" value="' + esc(p ? p.title : "صيانة مكيفات") + '"></label>';
+  var ps = (S.cache.custSites || []).filter(function (s) { return s.active || (p && p.site_id === s.id); });
+  h += '<label class="f"><span>الموقع</span><select id="pl_site">' + (ps.length === 1 ? "" : '<option value="">— كل المواقع / بلا تحديد —</option>') + ps.map(function (s) { return '<option value="' + s.id + '"' + (p && p.site_id === s.id ? " selected" : "") + ">" + esc(siteText(s)) + "</option>"; }).join("") + "</select></label>";
   h += '<div class="f2"><label class="f"><span>كل كم يوم</span><select id="pl_every">' + [[30, "شهر"], [60, "شهرين"], [90, "3 أشهر"], [180, "6 أشهر"], [365, "سنة"]].map(function (o) { return '<option value="' + o[0] + '"' + ((p ? p.every_days : 180) === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") +
     '</select></label><label class="f"><span>أول موعد</span><input id="pl_next" type="date" value="' + esc(p ? p.next_date : addDays(S.today, 7)) + '"></label></div>';
   h += '<div class="f"><span>مين بيروح عادة</span><div class="pick">' + field().map(function (u) { return '<label><input type="checkbox" name="pl_as" value="' + u.id + '"' + (p && p.assignees.indexOf(u.id) >= 0 ? " checked" : "") + "><span>" + esc(u.name) + "</span></label>"; }).join("") + "</div></div>";
@@ -784,7 +851,7 @@ function savePlan(btn) {
   btn.disabled = true;
   var as = Array.prototype.map.call(document.querySelectorAll('input[name="pl_as"]:checked'), function (x) { return x.value; });
   var cid = S.form.cid;
-  api("plan_save", { id: S.form.id, customer_id: cid, title: val("pl_title"), every_days: val("pl_every"), next_date: val("pl_next"), assignees: as, notes: val("pl_notes"), active: $("#pl_active") ? $("#pl_active").checked : true })
+  api("plan_save", { id: S.form.id, customer_id: cid, site_id: val("pl_site"), title: val("pl_title"), every_days: val("pl_every"), next_date: val("pl_next"), assignees: as, notes: val("pl_notes"), active: $("#pl_active") ? $("#pl_active").checked : true })
     .then(function () { toast("انحفظت ✓ — المهمة بتطلع بالجدول قبل موعدها بأسبوع"); openCustomerDetail(cid); }, function (e) { btn.disabled = false; fail(e); });
 }
 
@@ -797,7 +864,7 @@ function openWaPlan(date) {
     field().forEach(function (u) {
       var mine = ts.filter(function (t) { return t.assignees.indexOf(u.id) >= 0; });
       if (!mine.length) return;
-      var msg = "صباح الخير " + u.name + " 👋\nخطة " + dLabel(date) + ":\n" + mine.map(function (t, i) { return (i + 1) + ". " + (t.time ? t.time + " — " : "") + t.title + (t.customer_name ? " — " + t.customer_name : "") + (t.area ? " (" + t.area + ")" : ""); }).join("\n") +
+      var msg = "صباح الخير " + u.name + " 👋\nخطة " + dLabel(date) + ":\n" + mine.map(function (t, i) { return (i + 1) + ". " + (t.time ? t.time + " — " : "") + t.title + (t.customer_name ? " — " + t.customer_name : "") + (t.site_label ? " · " + t.site_label : "") + (t.area && t.area !== t.site_label ? " (" + t.area + ")" : ""); }).join("\n") +
         "\n\nالتفاصيل والموقع بالتطبيق: " + location.origin + "\nلا تنسى تقرير آخر النهار مع الصور 📷\n— iCOOL";
       var wn = waNumber(u.phone);
       h += '<div class="card" style="margin-top:10px"><div class="row between"><b>' + esc(u.name) + '</b><span class="tiny muted">' + mine.length + ' مهمة</span></div><div class="small" style="white-space:pre-wrap;margin-top:6px">' + esc(msg) + '</div><div class="acts">' +
@@ -852,7 +919,14 @@ var ACT = {
   taskNew: function (el) { openTask(null, el.dataset.date || S.date); },
   taskEdit: function (el) { openTask(el.dataset.id); },
   taskSave: saveTask,
-  taskForCust: function (el) { var id = el.dataset.id; openTask(null, S.today); setTimeout(function () { var s = $("#t_cust"); if (s) s.value = id; }, 300); },
+  taskForCust: function (el) {
+    var id = el.dataset.id, sid = el.dataset.site || "";
+    openTask(null, S.today);
+    setTimeout(function () { var s = $("#t_cust"); if (s) { s.value = id; fillSiteSelect("t_cust", "t_site", sid); } }, 300);
+  },
+  siteNew: function (el) { openSite(el.dataset.c); },
+  siteEdit: function (el) { openSite(el.dataset.c, el.dataset.id); },
+  siteSave: saveSite,
   custNew: function (el) { openCustomer(null, el.dataset.back); },
   custEdit: function (el) { openCustomer(el.dataset.id); },
   custOpen: function (el) { openCustomerDetail(el.dataset.id); },
@@ -873,7 +947,7 @@ var ACT = {
   delItem: function (el) {
     if (!confirm("أكيد بدك تحذف؟")) return;
     var t = el.dataset.t;
-    api("delete", { table: t, id: el.dataset.id }).then(function () { toast("انحذف"); if (t === "plan") { closeSheet(); render(); } else { closeSheet(); render(); } }, fail);
+    api("delete", { table: t, id: el.dataset.id }).then(function () { toast("انحذف"); if (t === "site") { S.cache.customers = null; openCustomerDetail(el.dataset.c); } else { closeSheet(); render(); } }, fail);
   },
   rv: function (el) { api("review", { table: el.dataset.t, id: el.dataset.id, status: el.dataset.s }).then(function () { toast(el.dataset.s === "approved" ? "اعتُمد ✓" : "انرفض"); render(); }, fail); },
   accOpen: function (el) { var n = el.dataset.n; api("balance", { name: n }).then(function (j) { sheet(sheetHead("حساب " + n) + accountHtml(n, j.balance, j.updated_at)); }, fail); },
@@ -892,9 +966,9 @@ var ACT = {
       var ts = (d.tasks || []).filter(function (t) { return t.assignees.indexOf(u.id) >= 0; });
       var rs = (d.reports || []).filter(function (r) { return r.user_id === u.id; });
       if (!ts.length && !rs.length) return;
-      var cust = ts[0] && ts[0].customer;
+      var cust = ts[0] && ts[0].customer, sv = ts[0] && ts[0].site;
       F.workers.push({ name: nm, start: (rs[0] && rs[0].start_time) || "08:00", end: (rs.length && rs[rs.length - 1].end_time) || "17:00",
-        site: cust ? (cust.platform_name || cust.name) : ((rs[0] && rs[0].site) || ""), work: ts.map(function (t) { return t.title; }).join(" + ") || ((rs[0] && rs[0].work) || "") });
+        site: sv && sv.platform_name ? sv.platform_name : cust ? (cust.platform_name || cust.name) : ((rs[0] && rs[0].site) || ""), work: ts.map(function (t) { return t.title; }).join(" + ") || ((rs[0] && rs[0].work) || "") });
     });
     drawLog($("#app"), []);
     toast("انعبّى من المهام والتقارير — راجع الأوقات");

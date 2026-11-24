@@ -5,3 +5,5 @@ Field app for iCOOL crews: daily task schedule linked to customer sites, end-of-
 - Static site (Vercel, root `daily-report/`). No build step.
 - Backend: Supabase project `icool-concept`, schema `dr` (see `sql/`). Browser holds only a session token; all access is through `public.dr_api`.
 - Link with منصة يوميات iCOOL: the platform page calls `dr.platform_sync()` through Ahmad's Supabase connector — pushes worker balances + attendance, pulls closed daily logs.
+
+- Customers and sites (24/11/2026): `dr.customers` is the person/company (name stays fixed); `dr.sites` holds each place (label, area, GPS, Deye system, platform name). Tasks, reports, expenses and plans carry `site_id`. See `sql/003_sites.sql`.
