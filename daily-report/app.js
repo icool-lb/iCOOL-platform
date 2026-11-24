@@ -110,7 +110,13 @@ function uploadPhoto(file, kind, date, taskId) {
       method: "POST", headers: { apikey: C.key, Authorization: "Bearer " + C.key, "Content-Type": "image/jpeg", "x-upsert": "false" }, body: blob
     }).then(function (r) {
       if (!r.ok) return r.text().then(function (t) { throw new Error("ما انرفعت الصورة (" + r.status + ")"); });
-      return api("photo_add", { path: path, kind: kind, date: date, task_id: taskId || "" }).then(function (j) { return { id: j.id, path: path, kind: kind }; });
+      return api("photo_add", { path: path, kind: kind, date: date, task_id: taskId || "" }).then(function (j) {
+        var ph = { id: j.id, path: path, kind: kind };
+        if (kind !== "sheet") return ph;
+        // sheet photos are also kept for the claude.ai reader (it reaches Supabase only through SQL)
+        return new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = function () { res(null); }; fr.readAsDataURL(blob); })
+          .then(function (b64) { return b64 ? api("photo_data", { id: j.id, b64: b64 }).catch(function () { }) : null; }).then(function () { return ph; });
+      });
     });
   });
 }
@@ -639,12 +645,23 @@ function printBlank(siteId) {
 }
 
 /* ---------------- handwriting reading (Claude via /api/read, same rules as منصة يوميات iCOOL) ---------------- */
-function readSheet(kind, photos, hint) {
+function readSheet(kind, photos, hint, siteId, date) {
   if (!photos || !photos.length) return Promise.reject(new Error("صوّر الورقة أول"));
-  toast("عم إقرا الورقة… (دقيقة تقريباً)");
-  return fetch("/api/read", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: S.token, kind: kind, paths: photos.map(function (p) { return p.path; }), hint: hint || {} }) })
-    .then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.ok) throw new Error((j && j.msg) || "ما زبطت القراءة"); return j.data; }); }, function () { throw new Error("ما في إنترنت"); });
+  return api("read_request", { kind: kind, site_id: siteId || "", date: date || S.date, photo_ids: photos.map(function (p) { return p.id; }), hint: hint || {} }).then(function (j) {
+    toast("انبعتت الورقة للقارئ" + (j.ahead ? " (قبلها " + j.ahead + ")" : "") + " — خلّيك هون");
+    var t0 = Date.now(), warned = false;
+    return new Promise(function (res, rej) {
+      (function poll() {
+        api("read_get", { id: j.id }).then(function (r) {
+          if (r.status === "done") return res(r.result);
+          if (r.status === "error") return rej(new Error("ما زبطت القراءة: " + (r.error || "")));
+          if (!warned && Date.now() - t0 > 45000 && !r.reader_seen) { warned = true; toast("قارئ iCOOL مش فاتح هلّق — الورقة محفوظة وبتنقرا لما ينفتح"); }
+          if (Date.now() - t0 > 6 * 60000) return rej(new Error("الورقة بالدور — ارجع لاحقاً وكبّس «اقرا» مرة تانية"));
+          setTimeout(poll, 6000);
+        }, rej);
+      })();
+    });
+  });
 }
 function normPlace(p) { return PLACES.indexOf(p) >= 0 ? p : "بالموقع"; }
 function applySiteRead(data) {
@@ -906,7 +923,7 @@ function vMore(app) {
   var h = '<div class="card" style="margin-top:14px"><div class="person"><span class="av">' + esc(initials(S.me.name)) + "</span><div><b>" + esc(S.me.name) + '</b><div class="tiny muted">' + esc(ROLE[S.me.role]) + (S.me.platform_name ? " · بالمنصة: " + esc(S.me.platform_name) : "") + "</div></div></div></div>";
   h += '<div class="card" style="margin-top:10px">';
   if (isBoss() && S.me.platform_name) h += '<div class="li" data-act="go" data-v="account" style="cursor:pointer"><span>💵</span><div class="m t">حسابي</div><span>‹</span></div>';
-  if (isAdmin()) h += '<div class="li" data-act="go" data-v="users" style="cursor:pointer"><span>👥</span><div class="m t">المستخدمين والرموز</div><span>‹</span></div><a class="li" href="' + esc(C.platformUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span>📊</span><div class="m t">منصة يوميات iCOOL</div><span>‹</span></a>';
+  if (isAdmin()) h += '<div class="li" data-act="go" data-v="users" style="cursor:pointer"><span>👥</span><div class="m t">المستخدمين والرموز</div><span>‹</span></div><a class="li" href="' + esc(C.platformUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span>📊</span><div class="m t">منصة يوميات iCOOL</div><span>‹</span></a>' + '<a class="li" href="' + esc(C.readerUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span>🔍</span><div class="m t">قارئ أوراق iCOOL (خلّيه فاتح لتنقرا الأوراق)</div><span>‹</span></a>';
   if (isBoss()) h += '<div class="li" data-act="go" data-v="stock" style="cursor:pointer"><span>🚐</span><div class="m t">جردة السيارات والمحل</div><span>‹</span></div>';
   h += '<div class="li" data-act="pinChange" style="cursor:pointer"><span>🔑</span><div class="m t">غيّر رمز الدخول</div><span>‹</span></div>';
   h += '<div class="li" data-act="logout" style="cursor:pointer;color:var(--bad)"><span>⎋</span><div class="m t">خروج</div></div></div>';
@@ -1262,14 +1279,14 @@ var ACT = {
   sfRead: function (el) {
     var F = S.sf; if (!F.paper.length) return toast("صوّر الورقة أول");
     el.disabled = true; var s = F.data.site || {};
-    readSheet("site", F.paper, { date: F.date, customer: (s.customer || {}).name, site: siteText(s) }).then(function (data) {
+    readSheet("site", F.paper, { date: F.date, customer: (s.customer || {}).name, site: siteText(s) }, F.site_id, F.date).then(function (data) {
       applySiteRead(data); toast("انقرت ✓ — راجع وصحّح قبل الحفظ"); drawSiteSheet();
     }, function (e) { el.disabled = false; fail(e); });
   },
   logRead: function (el) {
     var F = S.form; if (!F.sheet.length) return toast("صوّر الورقة أول");
     el.disabled = true;
-    readSheet("daylog", F.sheet, { date: F.date }).then(function (d) {
+    readSheet("daylog", F.sheet, { date: F.date }, "", F.date).then(function (d) {
       F.workers = (d.workers || []).map(function (w) { return { name: w.name || "", start: w.start || "", end: w.end || "", site: w.site || "", work: w.work || "", ot: w.ot == null ? "" : w.ot }; });
       F.materials = (d.materials || []).filter(function (m) { return !m.crossed_out; }).map(function (m) { return { item: m.item || "", qty: m.qty || "", source: m.source || "", site: m.site || "" }; });
       F.payments = (d.payments || []).filter(function (p) { return !p.crossed_out; }).map(function (p) { return { description: p.description || "", amount: p.amount || "", currency: p.currency === "LL" ? "LL" : "$", party: p.party || "" }; });
