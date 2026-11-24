@@ -1,4 +1,4 @@
-// Handwriting rules for iCOOL paper sheets (used by reader/index.html, the claude.ai reader) — condensed from منصة يوميات iCOOL (config/analysis_prompt + config/foreman,
+// Site-sheet reading prompt — copied into منصة يوميات iCOOL (DR_SITE_PROMPT); update both together — condensed from منصة يوميات iCOOL (config/analysis_prompt + config/foreman,
 // verified on Maher's sheets). Keep in step with the platform when its lessons change.
 
 const RULES = `FOREMAN / CREW HANDWRITING RULES (iCOOL, verified on Maher's sheets)

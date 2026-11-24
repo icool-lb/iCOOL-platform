@@ -648,14 +648,14 @@ function printBlank(siteId) {
 function readSheet(kind, photos, hint, siteId, date) {
   if (!photos || !photos.length) return Promise.reject(new Error("صوّر الورقة أول"));
   return api("read_request", { kind: kind, site_id: siteId || "", date: date || S.date, photo_ids: photos.map(function (p) { return p.id; }), hint: hint || {} }).then(function (j) {
-    toast("انبعتت الورقة للقارئ" + (j.ahead ? " (قبلها " + j.ahead + ")" : "") + " — خلّيك هون");
+    toast("انبعتت الورقة لمنصة اليوميات لتنقرا" + (j.ahead ? " (قبلها " + j.ahead + ")" : "") + " — خلّيك هون");
     var t0 = Date.now(), warned = false;
     return new Promise(function (res, rej) {
       (function poll() {
         api("read_get", { id: j.id }).then(function (r) {
           if (r.status === "done") return res(r.result);
           if (r.status === "error") return rej(new Error("ما زبطت القراءة: " + (r.error || "")));
-          if (!warned && Date.now() - t0 > 45000 && !r.reader_seen) { warned = true; toast("قارئ iCOOL مش فاتح هلّق — الورقة محفوظة وبتنقرا لما ينفتح"); }
+          if (!warned && Date.now() - t0 > 45000 && !r.reader_seen) { warned = true; toast("منصة اليوميات مش فاتحة هلّق — الورقة محفوظة وبتنقرا لما تنفتح"); }
           if (Date.now() - t0 > 6 * 60000) return rej(new Error("الورقة بالدور — ارجع لاحقاً وكبّس «اقرا» مرة تانية"));
           setTimeout(poll, 6000);
         }, rej);
@@ -923,7 +923,7 @@ function vMore(app) {
   var h = '<div class="card" style="margin-top:14px"><div class="person"><span class="av">' + esc(initials(S.me.name)) + "</span><div><b>" + esc(S.me.name) + '</b><div class="tiny muted">' + esc(ROLE[S.me.role]) + (S.me.platform_name ? " · بالمنصة: " + esc(S.me.platform_name) : "") + "</div></div></div></div>";
   h += '<div class="card" style="margin-top:10px">';
   if (isBoss() && S.me.platform_name) h += '<div class="li" data-act="go" data-v="account" style="cursor:pointer"><span>💵</span><div class="m t">حسابي</div><span>‹</span></div>';
-  if (isAdmin()) h += '<div class="li" data-act="go" data-v="users" style="cursor:pointer"><span>👥</span><div class="m t">المستخدمين والرموز</div><span>‹</span></div><a class="li" href="' + esc(C.platformUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span>📊</span><div class="m t">منصة يوميات iCOOL</div><span>‹</span></a>' + '<a class="li" href="' + esc(C.readerUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span>🔍</span><div class="m t">قارئ أوراق iCOOL (خلّيه فاتح لتنقرا الأوراق)</div><span>‹</span></a>';
+  if (isAdmin()) h += '<div class="li" data-act="go" data-v="users" style="cursor:pointer"><span>👥</span><div class="m t">المستخدمين والرموز</div><span>‹</span></div><a class="li" href="' + esc(C.platformUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span>📊</span><div class="m t">منصة يوميات iCOOL</div><span>‹</span></a>';
   if (isBoss()) h += '<div class="li" data-act="go" data-v="stock" style="cursor:pointer"><span>🚐</span><div class="m t">جردة السيارات والمحل</div><span>‹</span></div>';
   h += '<div class="li" data-act="pinChange" style="cursor:pointer"><span>🔑</span><div class="m t">غيّر رمز الدخول</div><span>‹</span></div>';
   h += '<div class="li" data-act="logout" style="cursor:pointer;color:var(--bad)"><span>⎋</span><div class="m t">خروج</div></div></div>';
@@ -1287,9 +1287,11 @@ var ACT = {
     var F = S.form; if (!F.sheet.length) return toast("صوّر الورقة أول");
     el.disabled = true;
     readSheet("daylog", F.sheet, { date: F.date }, "", F.date).then(function (d) {
-      F.workers = (d.workers || []).map(function (w) { return { name: w.name || "", start: w.start || "", end: w.end || "", site: w.site || "", work: w.work || "", ot: w.ot == null ? "" : w.ot }; });
-      F.materials = (d.materials || []).filter(function (m) { return !m.crossed_out; }).map(function (m) { return { item: m.item || "", qty: m.qty || "", source: m.source || "", site: m.site || "" }; });
-      F.payments = (d.payments || []).filter(function (p) { return !p.crossed_out; }).map(function (p) { return { description: p.description || "", amount: p.amount || "", currency: p.currency === "LL" ? "LL" : "$", party: p.party || "" }; });
+      var ot = function (w) { var v = w.ot != null ? w.ot : w.overtime_hours != null ? w.overtime_hours : w.overtime_estimated; return v == null ? "" : v; };
+      F.workers = (d.workers || []).filter(function (w) { return !w.duplicate; }).map(function (w) { return { name: w.name || "", start: w.start || "", end: w.end || "", site: w.site || "", work: w.work || "", ot: ot(w) }; });
+      d.doubts = (d.doubts || []).concat((d.workers || []).concat(d.materials || [], d.payments || []).filter(function (x) { return x.uncertain || x.status === "needs_human"; }).map(function (x) { return (x.name || x.item || x.description || "") + ": " + (x.uncertain || "بحاجة مراجعة"); }));
+      F.materials = (d.materials || []).filter(function (m) { return !m.crossed_out && !m.duplicate; }).map(function (m) { return { item: m.item || "", qty: m.qty || "", source: m.source || "", site: m.site || "" }; });
+      F.payments = (d.payments || []).filter(function (p) { return !p.crossed_out && !p.duplicate; }).map(function (p) { return { description: p.description || "", amount: p.amount || "", currency: p.currency === "LL" ? "LL" : "$", party: p.party || "" }; });
       if ((d.doubts || []).length) F.notes = ((F.notes || "") + "\nشكوك القراءة: " + d.doubts.join(" · ")).trim();
       F.mode = "app"; drawLog($("#app"), []); toast("انقرت الورقة ✓ — راجع كل سطر قبل التسكير");
     }, function (e) { el.disabled = false; fail(e); });
