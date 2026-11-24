@@ -235,6 +235,8 @@ function taskCard(t, opts) {
   h += '<div class="acts">';
   if (ml) h += '<a class="btn sm" href="' + esc(ml) + '" target="_blank" rel="noopener">📍 الموقع</a>';
   if (tl) h += '<a class="btn sm" href="' + esc(tl) + '">📞 اتصال</a>';
+  if (mine) h += visitBtns(t);
+  else if (isBoss() && t.site_id) h += '<button class="btn sm" data-act="siteSheet" data-site="' + t.site_id + '">📋 ورقة الموقع</button>';
   if (mine || isBoss()) {
     if (t.status === "planned") h += '<button class="btn sm" data-act="taskSt" data-id="' + t.id + '" data-s="in_progress">▶︎ بلّشت</button>';
     if (t.status !== "done") h += '<button class="btn sm pri" data-act="report" data-task="' + t.id + '">📝 تقرير وصور</button>';
@@ -267,6 +269,9 @@ function vWorkerToday(app) {
       h += '<div class="banner warn">⚠️ <div><b>تقرير آخر النهار إلزامي</b><br>صوّر الشغل المنجز واكتب شو خلّصت' + (noRep.length ? " — باقي " + noRep.length + " مهمة بلا تقرير" : "") + ".</div></div>";
     h += '<div class="sec-h"><h2>مهامي</h2></div>';
     h += tasks.length ? tasks.map(function (t) { return taskCard(t); }).join("") : '<div class="card empty"><b>ما في مهام مسجّلة</b>إذا اشتغلت بموقع، اكتب تقرير تحت.</div>';
+    var mv = (d.visits || []).filter(function (v) { return v.user_id === S.me.id; });
+    h += '<div class="sec-h"><h2>دوامي بالمواقع</h2><button class="btn sm" data-act="freeSite">+ موقع بلا مهمة</button></div>';
+    h += mv.length ? '<div class="card tight">' + mv.map(function (v) { return visitLine(v).replace("</div></div>", '</div></div>' + (v.leave_at ? "" : '<button class="btn sm danger" data-act="leave" data-id="' + v.id + '">طلعت</button>') + '<button class="btn sm" data-act="siteSheet" data-site="' + v.site_id + '">📋</button>'); }).join("") + "</div>" : '<div class="tiny muted">كبّس «🟢 وصلت» لما توصل عالموقع و«🔴 طلعت» لما تفلّ — الوقت والمكان بيتسجّلوا لحالن.</div>';
     h += '<div class="sec-h"><h2>تقاريري</h2><button class="btn sm pri" data-act="report">+ تقرير شغل</button></div>';
     h += reps.length ? reps.map(repBlock).join("") : '<div class="card empty">لسا ما في تقرير لهالنهار</div>';
     h += moneySection(d);
@@ -306,6 +311,8 @@ function vBossToday(app) {
     } else if (logs.length) {
       h += '<div class="banner ok">🧾 <div class="grow">' + logs.map(function (l) { return esc(uname(l.foreman_id)) + ": " + (l.closed ? "الورقة مسكّرة" : "مسودة") + (l.mode === "paper" ? " (ورقة)" : " (موبايل)"); }).join("<br>") + "</div></div>";
     }
+    var nSh = (d.sheets || []).length, nV = (d.visits || []).length;
+    h += '<div class="banner info">🧩 <div class="grow"><b>الورقة الموحّدة</b><br><span class="small">' + nV + " وصول · " + nSh + ' ورقة موقع</span></div><button class="btn sm pri" data-act="unified">فتح</button></div>';
     if (d.platform && d.platform.length) h += crossCheck(S.date, d.platform, reps);
     h += '<div class="sec-h"><h2>المهام</h2><button class="btn sm pri" data-act="taskNew">+ مهمة</button></div>';
     var people = field(), any = false;
@@ -318,6 +325,8 @@ function vBossToday(app) {
       var hrs = urs.reduce(function (s, r) { var x = hoursBetween(r.start_time, r.end_time); return s + (x || 0); }, 0);
       h += '<div class="wk"><span class="person"><span class="av">' + esc(initials(u.name)) + "</span>" + esc(u.name) + '</span><span class="tiny muted">' +
         ts.filter(function (t) { return t.status === "done"; }).length + "/" + ts.length + " منجزة · " + urs.length + " تقرير" + (hrs ? " · " + fmtH(hrs) : "") + "</span></div>";
+      var uv = (d.visits || []).filter(function (v) { return v.user_id === u.id; });
+      if (uv.length) h += '<div class="card tight">' + uv.map(visitLine).join("") + "</div>";
       h += ts.map(function (t) { return taskCard(t, { showReports: true }); }).join("");
       h += rs.map(repBlock).join("");
     });
@@ -418,6 +427,214 @@ function custRows(list, q) {
   }).join("");
 }
 
+/* ---------------- site sheet (ورقة الموقع): arrival/leave GPS, work, goods, expenses, missing customer info ---------------- */
+var MK = { received: "استلمنا", used: "استعملنا", left: "باقي" };
+var PLACES = ["بالموقع", "بالفان", "برابيد الفورمان", "برابيد المحل", "بالبيك أب", "بالمحل / المستودع"];
+function getPos() {
+  return new Promise(function (res) {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(function (p) { res({ lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6), acc: Math.round(p.coords.accuracy) }); },
+      function () { res(null); }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+  });
+}
+function myOpenVisit(siteId) {
+  var l = (S.day && S.day.visits) || [];
+  for (var i = l.length - 1; i >= 0; i--) if (l[i].user_id === S.me.id && !l[i].leave_at && (!siteId || l[i].site_id === siteId)) return l[i];
+  return null;
+}
+function myVisits(siteId) { return ((S.day && S.day.visits) || []).filter(function (v) { return v.user_id === S.me.id && v.site_id === siteId; }); }
+function distChip(m) { if (m == null) return '<span class="chip warn">بلا GPS</span>'; return m > 300 ? '<span class="chip bad">بعيد ' + (m >= 1000 ? (m / 1000).toFixed(1) + " كم" : Math.round(m) + " م") + "</span>" : '<span class="chip ok">' + Math.round(m) + " م</span>"; }
+function visitLine(v) {
+  return '<div class="li"><div class="m"><div class="t small">' + esc(v.user_name || uname(v.user_id)) + ' <span class="mono">' + esc(v.arrive_hm || "") + " → " + esc(v.leave_hm || "…") + '</span></div><div class="tiny muted">' + esc((v.customer_name || "") + (v.site_label ? " · " + v.site_label : "")) +
+    "</div></div>" + distChip(v.arrive_dist_m) + (v.leave_at ? "" : '<span class="chip blue">بالموقع</span>') + "</div>";
+}
+/* buttons on a task card */
+function visitBtns(t) {
+  if (!t.site_id && !(t.customer)) return "";
+  if (S.date !== S.today) return t.site_id ? '<button class="btn sm" data-act="siteSheet" data-site="' + t.site_id + '">📋 ورقة الموقع</button>' : "";
+  var ov = t.site_id ? myOpenVisit(t.site_id) : null, h = "";
+  if (ov) h += '<span class="chip blue">وصلت ' + esc(ov.arrive_hm) + '</span><button class="btn sm danger" data-act="leave" data-id="' + ov.id + '">🔴 طلعت</button>';
+  else h += '<button class="btn sm ok" data-act="arrive" data-site="' + (t.site_id || "") + '" data-task="' + t.id + '" data-cust="' + (t.customer_id || "") + '">🟢 وصلت</button>';
+  if (t.site_id) h += '<button class="btn sm" data-act="siteSheet" data-site="' + t.site_id + '">📋 ورقة الموقع</button>';
+  return h;
+}
+function doArriveThen(siteId, taskId, back) {
+  toast("عم جيب موقعك…");
+  getPos().then(function (pos) {
+    if (!pos && !confirm("ما قدرت جيب الـ GPS. سجّل الوصول بلا موقع؟ (بيبيّن للمدير «بلا GPS»)")) return;
+    return api("visit_arrive", Object.assign({ site_id: siteId, task_id: taskId || "" }, pos || {})).then(function (j) {
+      toast(j.again ? "مسجّل من قبل ✓" : "انسجّل الوصول ✓ " + (j.visit.arrive_hm || ""));
+      return loadDay().then(function () { if (back === "site") openSiteSheet(siteId, true); else render(); });
+    });
+  }).catch(fail);
+}
+function pickSiteThen(cb, custId, title) {
+  loadCustomers(true).then(function (cs) {
+    var list = custId ? cs.filter(function (c) { return c.id === custId; }) : cs;
+    var opts = []; list.forEach(function (c) { sitesOf(c).forEach(function (s) { opts.push({ c: c, s: s }); }); });
+    if (opts.length === 1) return cb(opts[0].s.id);
+    var h = sheetHead(title || "اختر الموقع");
+    if (!custId) h += '<input id="psq" placeholder="دوّر على زبون" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px;margin-bottom:8px">';
+    h += '<div class="card" id="pslist">' + opts.map(function (o) { return '<div class="li" data-act="pickSite" data-id="' + o.s.id + '" data-q="' + esc(normName(o.c.name + " " + o.s.label + " " + (o.s.area || ""))) + '" style="cursor:pointer"><div class="m"><div class="t">' + esc(o.c.name) + '</div><div class="tiny muted">' + esc(siteText(o.s)) + "</div></div><span>‹</span></div>"; }).join("") +
+      (opts.length ? "" : '<div class="empty">ما في مواقع — اطلب من المكتب يزيد الموقع</div>') + "</div>";
+    S.pickCb = cb; sheet(h);
+    var q = $("#psq"); if (q) q.addEventListener("input", function () { var n = normName(q.value); Array.prototype.forEach.call(document.querySelectorAll("#pslist .li"), function (li) { li.hidden = n && li.dataset.q.indexOf(n) < 0; }); });
+  }, fail);
+}
+
+function openSiteSheet(siteId, keep) {
+  var date = S.date || S.today;
+  api("sitesheet_get", { site_id: siteId, date: date }).then(function (d) {
+    var sh = d.sheet;
+    if (!keep || !S.sf || S.sf.site_id !== siteId) {
+      S.sf = { _type: "sitesheet", site_id: siteId, date: date, mode: sh ? sh.mode : "app", work: sh ? sh.work || "" : "",
+        work_ph: sh ? sh.work_photos || [] : [], paper: sh ? sh.paper_photos || [] : [], materials: sh ? (sh.materials || []).map(function (m) { return Object.assign({}, m); }) : [],
+        fixes: Object.assign({ name: "", phone: "", address: "" }, sh ? sh.fixes || {} : {}), notes: sh ? sh.notes || "" : "", closed: sh ? sh.closed : false };
+    }
+    S.sf.data = d; S.form = S.sf;
+    drawSiteSheet();
+  }, fail);
+}
+function drawSiteSheet() {
+  var F = S.sf, d = F.data, s = d.site || {}, c = s.customer || {}, ml = mapLink(s);
+  var mine = d.visits.filter(function (v) { return v.user_id === S.me.id; }), open = mine.filter(function (v) { return !v.leave_at; })[0];
+  var h = sheetHead("ورقة الموقع") + '<div><b>' + esc(c.name) + "</b> — " + esc(siteText(s)) + '</div><div class="tiny muted">' + esc(dLabel(F.date)) + (F.closed ? " · ✓ مسكّرة" : "") + "</div>";
+  h += '<div class="acts">' + (ml ? '<a class="btn sm" href="' + esc(ml) + '" target="_blank" rel="noopener">📍 الخريطة</a>' : '<span class="chip warn">الزبون بلا موقع عالخريطة</span>') +
+    (c.phone ? '<a class="btn sm" href="' + esc(telLink(c.phone)) + '">📞 ' + esc(c.phone) + "</a>" : "");
+  if (F.date === S.today) h += open ? '<span class="chip blue">وصلت ' + esc(open.arrive_hm) + '</span><button class="btn sm danger" data-act="leave" data-id="' + open.id + '" data-back="site">🔴 طلعت</button>' : '<button class="btn sm ok" data-act="arrive" data-site="' + s.id + '" data-back="site">🟢 وصلت</button>';
+  h += "</div>";
+  h += '<h3>الدوام بالموقع</h3><div class="card tight">' + (d.visits.map(visitLine).join("") || '<div class="tiny muted">لسا حدا ما كبس «وصلت». الوقت والموقع بيتسجّلوا لحالن وما بيتعدّلوا.</div>') + "</div>";
+  h += '<div class="seg" style="margin-top:12px"><button data-act="sfMode" data-m="app" class="' + (F.mode === "app" ? "on" : "") + '">📱 تعبئة من الموبايل</button><button data-act="sfMode" data-m="paper" class="' + (F.mode === "paper" ? "on" : "") + '">📄 ورقة مطبوعة + صورة</button></div>';
+  if (F.mode === "paper") {
+    h += '<div class="card" style="margin-top:10px"><b>صوّر ورقة الموقع المعبّاية</b><div class="tiny muted">الوجهين، من فوق، كل الورقة بالكادر.</div>' + photoField("paper", [["sheet", "وجه"], ["sheet", "ضهر"]]) + '<div class="acts"><button class="btn sm" data-act="printBlank" data-site="' + s.id + '">🖨️ النموذج للطباعة</button></div></div>';
+    h += '<h3>صور الشغل المنجز</h3>' + photoField("work_ph", [["before", "قبل"], ["after", "منجز"]]);
+  } else {
+    h += '<label class="f"><span>الشغل المنجز اليوم <b class="req">*</b></span><textarea data-lf="work" placeholder="مثلاً: تمديد 40م كابل 6مم، تركيب لوحة DC، تجربة الإنفرتر">' + esc(F.work) + "</textarea></label>";
+    h += '<div class="f"><span>صور الشغل <b class="req">* إلزامي</b></span>' + photoField("work_ph", [["before", "قبل"], ["after", "منجز"]]) + "</div>";
+    h += '<div class="sec-h"><h3>البضاعة</h3><div class="row"><button class="btn sm" data-act="sfAdd" data-k="received">+ استلام</button><button class="btn sm" data-act="sfAdd" data-k="used">+ استعمال</button><button class="btn sm" data-act="sfAdd" data-k="left">+ باقي</button></div></div>';
+    h += F.materials.map(function (m, i) {
+      return '<div class="logrow"><div class="row between"><span class="chip ' + (m.kind === "received" ? "blue" : m.kind === "left" ? "warn" : "ok") + '">' + (MK[m.kind] || m.kind) + '</span><button class="btn sm danger" data-act="sfDel" data-i="' + i + '">شيل</button></div>' +
+        '<div class="f2"><label class="f"><span>الصنف</span><input data-lf="materials.' + i + '.item" value="' + esc(m.item) + '"></label><label class="f"><span>الكمية</span><input data-lf="materials.' + i + '.qty" value="' + esc(m.qty) + '"></label></div>' +
+        '<div class="f2"><label class="f"><span>' + (m.kind === "received" ? "من وين (المصدر)" : "المكان") + "</span>" + (m.kind === "received" ? '<input list="dl_src" data-lf="materials.' + i + '.source" value="' + esc(m.source || "") + '">' :
+          '<select data-lf="materials.' + i + '.place">' + PLACES.map(function (p) { return "<option" + (m.place === p ? " selected" : "") + ">" + p + "</option>"; }).join("") + "</select>") + "</label>" +
+        (m.kind === "received" ? '<label class="f"><span>وين نزلت</span><select data-lf="materials.' + i + '.place">' + PLACES.map(function (p) { return "<option" + (m.place === p ? " selected" : "") + ">" + p + "</option>"; }).join("") + "</select></label>" : "<span></span>") + "</div></div>";
+    }).join("") || '<div class="tiny muted">شو استلمتوا، شو استعملتوا، وشو باقي بالموقع أو بالسيارات.</div>';
+  }
+  /* money at this site */
+  var ex = d.expenses || [], py = d.payments || [];
+  h += '<div class="sec-h"><h3>مصاريف ودفعات الموقع</h3></div><div class="acts"><button class="btn sm" data-act="sfExp" data-k="fuel">⛽ محروقات</button><button class="btn sm" data-act="sfExp" data-k="repair">🔧 تصليح</button><button class="btn sm" data-act="sfExp" data-k="goods">🧾 بضاعة</button><button class="btn sm" data-act="sfExp" data-k="other">➕ غيره</button><button class="btn sm" data-act="sfPay">💵 دفعة/مقبوض</button></div>';
+  if (ex.length || py.length) h += '<div class="card tight" style="margin-top:8px">' + ex.map(function (e) { return '<div class="li"><div class="m"><div class="t small">' + esc(e.item) + '</div><div class="tiny muted">' + esc(e.source) + " · " + esc(e.paid_by || "") + " · " + esc(e.user_name || "") + '</div><div class="thumbs">' + thumbs(e.photos) + '</div></div><b class="num">' + money(e.amount, e.currency) + "</b></div>"; }).join("") +
+    py.map(function (p) { return '<div class="li"><div class="m"><div class="t small">💵 ' + esc(PAYK[p.kind] || p.kind) + " — " + esc(p.party) + '</div><div class="tiny muted">' + esc(p.note || "") + '</div></div><b class="num">' + money(p.amount, p.currency) + "</b></div>"; }).join("") + "</div>";
+  /* missing customer details */
+  h += '<h3>معلومات الزبون الناقصة</h3>';
+  if (s.lat == null) h += '<div class="banner warn">📍 <div class="grow">الموقع مش مثبّت عالخريطة.<br><span class="small">كبّس «وصلت» وإنت بالموقع، وبعدين ثبّته من هون.</span></div><button class="btn sm pri" data-act="fixGps" data-site="' + s.id + '">ثبّت</button></div>';
+  h += '<div class="f2"><label class="f"><span>اسم الزبون الصحيح</span><input data-lf="fixes.name" value="' + esc(F.fixes.name) + '" placeholder="' + esc(c.name) + '"></label><label class="f"><span>تلفون الزبون</span><input data-lf="fixes.phone" inputmode="tel" value="' + esc(F.fixes.phone) + '" placeholder="' + esc(c.phone || "ناقص") + '"></label></div>';
+  h += '<label class="f"><span>العنوان / كيف منوصل</span><input data-lf="fixes.address" value="' + esc(F.fixes.address) + '" placeholder="' + esc(s.address || "") + '"></label>';
+  h += '<label class="f"><span>ملاحظات</span><textarea data-lf="notes">' + esc(F.notes) + "</textarea></label>";
+  h += '<div class="sheet-f"><button class="btn" data-act="sfSave" data-close="0">حفظ</button><button class="btn or" data-act="sfSave" data-close="1">✓ تسكير الورقة</button></div>' + datalists();
+  sheet(h);
+}
+function saveSiteSheet(btn) {
+  var F = S.sf, close = btn.dataset.close === "1";
+  if (close && F.mode === "app" && (F.work || "").trim().length < 8) return toast("اكتب شو انعمل اليوم");
+  if (close && F.mode === "app" && !F.work_ph.length) return toast("صوّر الشغل المنجز");
+  if (close && F.mode === "paper" && !F.paper.length) return toast("صوّر الورقة المطبوعة");
+  btn.disabled = true;
+  var mats = F.materials.filter(function (m) { return (m.item || "").trim(); });
+  api("sitesheet_save", { site_id: F.site_id, date: F.date, mode: F.mode, work: F.work, work_photo_ids: F.work_ph.map(function (p) { return p.id; }), paper_photo_ids: F.paper.map(function (p) { return p.id; }),
+    materials: mats, fixes: F.fixes, notes: F.notes, close: close }).then(function () {
+    toast(close ? "تسكّرت ورقة الموقع ✓" : "انحفظت ✓");
+    if (close) { S.sf = null; closeSheet(); render(); } else { btn.disabled = false; F.closed = false; }
+  }, function (e) { btn.disabled = false; fail(e); });
+}
+
+/* unified day sheet built from all site sheets + visits (boss) */
+function unifiedRows(u) {
+  var by = {};
+  (u.visits || []).forEach(function (v) {
+    var k = v.user_id, w = by[k] || (by[k] = { user_id: k, name: v.user_name, first: null, last: null, open: false, sites: [], flags: [] });
+    if (!w.first || v.arrive_hm < w.first) w.first = v.arrive_hm;
+    if (v.leave_hm && (!w.last || v.leave_hm > w.last)) w.last = v.leave_hm;
+    if (!v.leave_at) w.open = true;
+    var lbl = (v.customer_name || "") + (v.site_label ? " — " + v.site_label : "");
+    if (w.sites.indexOf(lbl) < 0) w.sites.push(lbl);
+    if (v.arrive_dist_m == null) w.flags.push("وصول بلا GPS"); else if (v.arrive_dist_m > 300) w.flags.push("وصل بعيد " + Math.round(v.arrive_dist_m) + "م");
+  });
+  return Object.keys(by).map(function (k) { return by[k]; });
+}
+function openUnified(date) {
+  date = date || S.date || S.today;
+  api("unified", { date: date }).then(function (u) {
+    S.cache.unified = u;
+    var rows = unifiedRows(u), sheets = u.sheets || [];
+    var h = sheetHead("الورقة الموحّدة") + '<div class="tiny muted">' + esc(dLabel(date)) + " · من أوراق المواقع ووصول/خروج العمال</div>";
+    var visitSites = {}; (u.visits || []).forEach(function (v) { visitSites[v.site_id] = v.customer_name + " — " + v.site_label; });
+    var noSheet = Object.keys(visitSites).filter(function (sid) { return !sheets.some(function (x) { return x.site_id === sid; }); });
+    var openS = sheets.filter(function (x) { return !x.closed; });
+    if (noSheet.length || openS.length || rows.some(function (r) { return r.open; }))
+      h += '<div class="banner warn">⚠️ <div>' + (noSheet.length ? "مواقع بلا ورقة: " + esc(noSheet.map(function (k) { return visitSites[k]; }).join("، ")) + "<br>" : "") + (openS.length ? openS.length + " ورقة موقع مش مسكّرة<br>" : "") +
+        (rows.some(function (r) { return r.open; }) ? "في عمال ما كبسوا «طلعت»" : "") + "</div></div>";
+    h += '<div class="printable"><div class="pr-head"><img src="logo.png" alt="iCOOL"><div><b>الورقة اليومية الموحّدة</b><br>' + esc(dLabel(date)) + "</div></div>";
+    h += '<h3>العمال</h3><table class="ut"><tr><th>العامل</th><th>وصل</th><th>طلع</th><th>ساعات</th><th>إضافي</th><th>المواقع</th></tr>' + rows.map(function (r) {
+      var hrs = hoursBetween(r.first, r.last), ot = r.last ? otOf({ name: r.name, start: r.first, end: r.last }) : null;
+      return "<tr><td>" + esc(r.name) + (r.flags.length ? '<div class="tiny" style="color:var(--bad)">' + esc(r.flags.join("، ")) + "</div>" : "") + '</td><td class="mono">' + esc(r.first || "") + '</td><td class="mono">' + esc(r.last || (r.open ? "…" : "")) + "</td><td>" + fmtH(hrs) + "</td><td>" + (ot == null ? "—" : ot) + "</td><td>" + esc(r.sites.join("، ")) + "</td></tr>";
+    }).join("") + "</table>";
+    if (!rows.length) h += '<div class="tiny muted">ما حدا كبس «وصلت» بهالنهار.</div>';
+    h += "<h3>المواقع</h3>" + (sheets.map(function (x) {
+      var st = x.site || {}, c = st.customer || {}, ms = x.materials || [];
+      var grp = function (k) { var l = ms.filter(function (m) { return m.kind === k; }); return l.length ? "<div class=\"small\"><b>" + MK[k] + ":</b> " + l.map(function (m) { return esc(m.item + (m.qty ? " × " + m.qty : "") + (m.place && k !== "used" ? " (" + m.place + ")" : "") + (m.source ? " ← " + m.source : "")); }).join("، ") + "</div>" : ""; };
+      var fx = x.fixes || {}, hasFix = !x.fixes_applied && (fx.name || fx.address || fx.phone);
+      return '<div class="card tight" style="margin-top:8px"><div class="row between"><b>' + esc(c.name) + " — " + esc(st.label || "") + '</b><span class="chip ' + (x.closed ? "ok" : "warn") + '">' + (x.closed ? "مسكّرة" : "مسودة") + (x.mode === "paper" ? " · ورقة" : "") + "</span></div>" +
+        (x.work ? '<div class="small" style="white-space:pre-wrap">' + esc(x.work) + "</div>" : "") + grp("received") + grp("used") + grp("left") +
+        (hasFix ? '<div class="small" style="color:var(--or)">تصحيح معلومات: ' + esc([fx.name, fx.phone, fx.address].filter(Boolean).join(" · ")) + (isAdmin() ? ' <button class="btn sm" data-act="fixApply" data-id="' + x.id + '">طبّق</button>' : "") + "</div>" : "") +
+        '<div class="thumbs noprint">' + thumbs(x.work_photos) + thumbs(x.paper_photos) + '</div><div class="acts noprint"><button class="btn sm" data-act="siteSheet" data-site="' + x.site_id + '">فتح</button></div></div>';
+    }).join("") || '<div class="tiny muted">ما في أوراق مواقع.</div>');
+    var ex = u.expenses || [], py = u.payments || [];
+    h += "<h3>مصاريف</h3>" + (ex.length ? '<table class="ut"><tr><th>البيان</th><th>الموقع</th><th>المصدر</th><th>مين دفع</th><th>المبلغ</th></tr>' + ex.map(function (e) { return "<tr><td>" + esc(e.item) + (e.vehicle ? " · " + esc(e.vehicle) : "") + "</td><td>" + esc((e.customer_name || "") + (e.site_label ? " — " + e.site_label : "") || e.site || "") + "</td><td>" + esc(e.source) + "</td><td>" + esc(e.paid_by || e.user_name) + '</td><td class="num">' + money(e.amount, e.currency) + "</td></tr>"; }).join("") + "</table>" : '<div class="tiny muted">ما في.</div>');
+    h += "<h3>دفعات ومقبوضات</h3>" + (py.length ? '<table class="ut"><tr><th>النوع</th><th>مين</th><th>سجّلها</th><th>المبلغ</th></tr>' + py.map(function (p) { return "<tr><td>" + esc(PAYK[p.kind] || p.kind) + "</td><td>" + esc(p.party) + "</td><td>" + esc(p.user_name) + '</td><td class="num">' + money(p.amount, p.currency) + "</td></tr>"; }).join("") + "</table>" : '<div class="tiny muted">ما في.</div>');
+    h += "</div>";
+    h += '<div class="sheet-f"><button class="btn" data-act="printNow">🖨️ طباعة</button>' + (isBoss() ? '<button class="btn pri" data-act="uniToLog">⤵︎ انقل لورقة الفورمان</button>' : "") + "</div>";
+    sheet(h);
+  }, fail);
+}
+function unifiedToLog() {
+  var u = S.cache.unified; if (!u) return;
+  var rows = unifiedRows(u), sheets = u.sheets || [];
+  var siteName = function (sid) { var x = sheets.filter(function (q) { return q.site_id === sid; })[0], v = (u.visits || []).filter(function (q) { return q.site_id === sid; })[0];
+    var st = x ? x.site : null; return st ? (st.platform_name || st.customer.name) : v ? v.customer_name : ""; };
+  var workers = rows.map(function (r) {
+    var u2 = S.users.filter(function (x) { return x.id === r.user_id; })[0] || {};
+    var vs = (u.visits || []).filter(function (v) { return v.user_id === r.user_id; });
+    var sites = []; vs.forEach(function (v) { var n = siteName(v.site_id); if (n && sites.indexOf(n) < 0) sites.push(n); });
+    var work = vs.map(function (v) { var x = sheets.filter(function (q) { return q.site_id === v.site_id; })[0]; return x && x.work ? x.work : ""; }).filter(Boolean);
+    return { name: u2.platform_name || r.name, start: r.first || "", end: r.last || "", site: sites.join(" + "), work: work.filter(function (w, i) { return work.indexOf(w) === i; }).join(" + ") };
+  });
+  var materials = [];
+  sheets.forEach(function (x) { (x.materials || []).forEach(function (m) { if (m.kind === "used" || m.kind === "received") materials.push({ item: m.item + (m.kind === "received" ? " (استلام)" : ""), qty: m.qty, source: m.source || "", site: siteName(x.site_id) }); }); });
+  var payments = (u.payments || []).map(function (p) { return { description: (PAYK[p.kind] || p.kind) + (p.note ? " — " + p.note : ""), amount: p.amount, currency: p.currency, party: p.party }; });
+  S.form = { _type: "log", date: u.date, mode: "app", sheet: [], workers: workers, materials: materials, payments: payments, notes: "منقولة من الورقة الموحّدة (أوراق المواقع)", closed: false };
+  S.date = u.date; closeSheet(); S.view = "log";
+  $("#barTitle").textContent = TITLES.log; drawLog($("#app"), []);
+  toast("انعبّت ورقة الفورمان — راجعها وسكّرها");
+}
+
+/* blank printable site form (to fill by hand and photograph) */
+function printBlank(siteId) {
+  var s = null, c = null;
+  (S.cache.customers || []).forEach(function (x) { sitesOf(x).forEach(function (y) { if (y.id === siteId) { s = y; c = x; } }); });
+  var rows = function (n, cols) { var r = ""; for (var i = 0; i < n; i++) r += "<tr>" + cols.map(function () { return "<td>&nbsp;</td>"; }).join("") + "</tr>"; return r; };
+  var h = sheetHead("نموذج ورقة الموقع") + '<div class="printable pform"><div class="pr-head"><img src="logo.png" alt="iCOOL"><div><b>ورقة الموقع اليومية</b><br><span class="small">HVAC • SOLAR • MEP</span></div><div class="small">التاريخ: ____/____/______</div></div>';
+  h += '<table class="ut"><tr><td style="width:50%">الزبون: <b>' + esc(c ? c.name : "") + '</b></td><td>الموقع: <b>' + esc(s ? siteText(s) : "") + "</b></td></tr><tr><td>تلفون الزبون: " + esc(c && c.phone ? c.phone : "") + "</td><td>العنوان / الخريطة: " + esc(s && s.address ? s.address : "") + "</td></tr></table>";
+  h += '<h3>الفريق</h3><table class="ut"><tr><th>العامل</th><th>وصل</th><th>طلع</th><th>توقيع</th></tr>' + rows(4, [1, 2, 3, 4]) + "</table>";
+  h += '<h3>الشغل المنجز</h3><table class="ut">' + rows(3, [1]) + "</table>";
+  h += '<h3>البضاعة</h3><table class="ut"><tr><th style="width:34%">الصنف</th><th>الكمية</th><th>استلام / استعمال / باقي</th><th>المكان (موقع، فان، رابيد…)</th><th>المصدر</th></tr>' + rows(8, [1, 2, 3, 4, 5]) + "</table>";
+  h += '<h3>مصاريف (محروقات، تصليح، بضاعة…)</h3><table class="ut"><tr><th style="width:34%">البيان</th><th>المبلغ $ / ل.ل</th><th>مين دفع</th><th>فاتورة؟</th></tr>' + rows(4, [1, 2, 3, 4]) + "</table>";
+  h += '<h3>دفعات ومقبوضات</h3><table class="ut"><tr><th style="width:34%">البيان</th><th>المبلغ</th><th>من / إلى</th></tr>' + rows(3, [1, 2, 3]) + "</table>";
+  h += '<div class="small" style="margin-top:6px">ملاحظات / معلومات ناقصة عن الزبون: ________________________________ &nbsp; توقيع المسؤول: ____________</div></div>';
+  h += '<div class="sheet-f"><button class="btn pri" data-act="printNow">🖨️ طباعة</button></div>';
+  sheet(h);
+}
+
 /* ---------------- daily log (foreman sheet) ---------------- */
 function vLog(app) {
   loading(app);
@@ -432,7 +649,7 @@ function vLog(app) {
 }
 function drawLog(app, others) {
   var F = S.form;
-  var h = dayBar();
+  var h = dayBar() + '<div class="acts"><button class="btn sm pri" data-act="unified">🧩 الورقة الموحّدة من المواقع</button></div>';
   if (F.closed) h += '<div class="banner ok">✓ الورقة مسكّرة — بتنتقل لمنصة اليوميات أوتوماتيك. فيك تعدّل وتسكّر من جديد.</div>';
   if (S.me.role === "admin" && others) {
     h += others.map(function (l) { return '<div class="card" style="margin-top:10px"><b>' + esc(uname(l.foreman_id)) + "</b> · " + (l.closed ? "مسكّرة" : "مسودة") + " · " + (l.mode === "paper" ? "ورقة" : "موبايل") + '<div class="thumbs">' + thumbs(l.sheet_photos) + "</div>" + (l.mode === "app" ? logSummary(l) : "") + "</div>"; }).join("");
@@ -667,16 +884,16 @@ function saveReport(btn) {
 }
 
 /* expense / payment forms */
-function openExpense(kind) {
-  S.form = { _type: "expense", kind: kind, photos: [] };
-  var fuel = kind === "fuel";
-  var h = sheetHead(fuel ? "محروقات" : "فاتورة بضاعة") + '<div class="banner info" style="margin-top:0">بلا صورة فاتورة ومصدر ما في صرف.</div>';
+function openExpense(kind, ctx) {
+  S.form = { _type: "expense", kind: kind, photos: [], ctx: ctx || null };
+  var fuel = kind === "fuel", repair = kind === "repair";
+  var h = sheetHead(fuel ? "محروقات" : repair ? "تصليح" : kind === "other" ? "مصروف" : "فاتورة بضاعة") + '<div class="banner info" style="margin-top:0">بلا صورة فاتورة ومصدر ما في صرف.</div>';
   h += '<div class="f"><span>صورة الفاتورة <b class="req">*</b></span>' + photoField("photos", [[fuel ? "fuel" : "invoice", "الفاتورة"]]) + "</div>";
-  if (fuel) h += '<label class="f"><span>للسيارة</span><select id="e_vehicle"><option>فان</option><option>رابيد الفورمان</option><option>رابيد المحل</option><option>بيك أب</option><option>موتير</option><option>غيره</option></select></label>';
-  else h += '<div class="f2"><label class="f"><span>الصنف <b class="req">*</b></span><input id="e_item" placeholder="شو اشتريت"></label><label class="f"><span>الكمية</span><input id="e_qty"></label></div>';
+  if (fuel || repair) h += '<label class="f"><span>' + (repair ? "شو تصلّح (سيارة/عدّة)" : "للسيارة") + '</span><select id="e_vehicle"><option>فان</option><option>رابيد الفورمان</option><option>رابيد المحل</option><option>بيك أب</option><option>موتير</option><option>عدّة</option><option>غيره</option></select></label>';
+  if (!fuel) h += '<div class="f2"><label class="f"><span>' + (repair ? "التصليح" : "الصنف") + ' <b class="req">*</b></span><input id="e_item" placeholder="' + (repair ? "مثلاً: تغيير زيت، دولاب" : "شو اشتريت") + '"></label><label class="f"><span>الكمية</span><input id="e_qty"></label></div>';
   h += '<div class="f2"><label class="f"><span>المبلغ <b class="req">*</b></span><input id="e_amount" inputmode="decimal"></label><label class="f"><span>العملة</span><select id="e_cur"><option value="$">$</option><option value="LL">ل.ل</option></select></label></div>';
   h += '<label class="f"><span>' + (fuel ? "المحطة" : "المصدر (المحل/المورد)") + ' <b class="req">*</b></span><input id="e_source" list="dl_src" placeholder="' + (fuel ? "اسم المحطة والبلدة" : "اسم المحل") + '"></label>';
-  h += '<label class="f"><span>للموقع / الزبون</span><input id="e_site" list="dl_sites"></label>';
+  if (!ctx) h += '<label class="f"><span>للموقع / الزبون</span><input id="e_site" list="dl_sites"></label>';
   h += '<label class="f"><span>مين دفع</span><select id="e_paid"><option value="' + esc(S.me.name) + ' — من جيبه">من جيبي</option><option value="من عهدة ماهر">من عهدة ماهر</option><option value="iCOOL">iCOOL (المهندس)</option><option value="على الحساب">على الحساب (دين)</option></select></label>';
   h += '<div class="sheet-f"><button class="btn pri" data-act="expenseSave">حفظ</button></div>' + datalists();
   sheet(h);
@@ -688,11 +905,11 @@ function saveExpense(btn) {
   if (val("e_source").length < 2) return toast("اكتب المصدر");
   if (!(+val("e_amount") > 0)) return toast("اكتب المبلغ");
   btn.disabled = true;
-  api("expense_save", { date: S.date, kind: F.kind, item: F.kind === "fuel" ? "بنزين/مازوت " + val("e_vehicle") : val("e_item"), qty: val("e_qty"), amount: val("e_amount"), currency: val("e_cur"), source: val("e_source"), vehicle: val("e_vehicle"), site: val("e_site"), paid_by: val("e_paid"), photo_ids: F.photos.map(function (p) { return p.id; }) })
-    .then(function () { closeSheet(); toast("انحفظت ✓ — بانتظار الاعتماد"); render(); }, function (e) { btn.disabled = false; fail(e); });
+  api("expense_save", { date: S.date, kind: F.kind, item: F.kind === "fuel" ? "بنزين/مازوت " + val("e_vehicle") : F.kind === "repair" ? "تصليح " + val("e_vehicle") + " — " + val("e_item") : val("e_item"), site_id: F.ctx ? F.ctx.site_id : "", qty: val("e_qty"), amount: val("e_amount"), currency: val("e_cur"), source: val("e_source"), vehicle: val("e_vehicle"), site: F.ctx ? "" : val("e_site"), paid_by: val("e_paid"), photo_ids: F.photos.map(function (p) { return p.id; }) })
+    .then(function () { toast("انحفظت ✓ — بانتظار الاعتماد"); if (F.ctx) return openSiteSheet(F.ctx.site_id, true); closeSheet(); render(); }, function (e) { btn.disabled = false; fail(e); });
 }
-function openPayment() {
-  S.form = { _type: "payment", photos: [] };
+function openPayment(ctx) {
+  S.form = { _type: "payment", photos: [], ctx: ctx && ctx.site_id ? ctx : null };
   var h = sheetHead("دفعة / مقبوض");
   h += '<label class="f"><span>النوع</span><select id="p_kind">' + Object.keys(PAYK).map(function (k) { return '<option value="' + k + '">' + PAYK[k] + "</option>"; }).join("") + "</select></label>";
   h += '<div class="f2"><label class="f"><span>المبلغ <b class="req">*</b></span><input id="p_amount" inputmode="decimal"></label><label class="f"><span>العملة</span><select id="p_cur"><option value="$">$</option><option value="LL">ل.ل</option></select></label></div>';
@@ -702,11 +919,12 @@ function openPayment() {
   sheet(h);
 }
 function savePayment(btn) {
+  var F0 = S.form;
   if (!(+val("p_amount") > 0)) return toast("اكتب المبلغ");
   if (val("p_party").length < 2) return toast("مين قبض/دفع؟");
   btn.disabled = true;
-  api("payment_save", { date: S.date, kind: val("p_kind"), amount: val("p_amount"), currency: val("p_cur"), party: val("p_party"), note: val("p_note"), photo_ids: S.form.photos.map(function (p) { return p.id; }) })
-    .then(function () { closeSheet(); toast("انحفظت ✓"); render(); }, function (e) { btn.disabled = false; fail(e); });
+  api("payment_save", { date: S.date, kind: val("p_kind"), amount: val("p_amount"), currency: val("p_cur"), party: val("p_party"), note: val("p_note"), site_id: S.form.ctx ? S.form.ctx.site_id : "", photo_ids: S.form.photos.map(function (p) { return p.id; }) })
+    .then(function () { toast("انحفظت ✓"); if (F0.ctx) return openSiteSheet(F0.ctx.site_id, true); closeSheet(); render(); }, function (e) { btn.disabled = false; fail(e); });
 }
 
 /* task form */
@@ -761,7 +979,7 @@ function openCustomer(id, back) {
   }
   h += '<label class="f"><span>الاسم بمنصة اليوميات (للربط بالحسابات)</span><input id="c_pname" list="dl_sites" value="' + esc(c ? c.platform_name || "" : "") + '"></label>';
   h += '<label class="f"><span>ملاحظات</span><textarea id="c_notes">' + esc(c ? c.notes || "" : "") + "</textarea></label>";
-  h += '<div class="sheet-f"><button class="btn pri" data-act="custSave">حفظ</button></div>' + datalists();
+  h += '<div class="sheet-f">' + (c && isAdmin() ? '<button class="btn danger" data-act="delItem" data-t="customer" data-id="' + c.id + '">حذف الزبون</button>' : "") + '<button class="btn pri" data-act="custSave">حفظ</button></div>' + datalists();
   sheet(h);
 }
 function siteFields(s) {
@@ -925,6 +1143,35 @@ var ACT = {
     setTimeout(function () { var s = $("#t_cust"); if (s) { s.value = id; fillSiteSelect("t_cust", "t_site", sid); } }, 300);
   },
   siteNew: function (el) { openSite(el.dataset.c); },
+  arrive: function (el) {
+    var sid = el.dataset.site, tid = el.dataset.task || "", back = el.dataset.back;
+    var go2 = function (id) { doArriveThen(id, tid, back); };
+    if (sid) go2(sid); else pickSiteThen(go2, el.dataset.cust || "", "بأي موقع وصلت؟");
+  },
+  leave: function (el) {
+    if (!confirm("أكّد إنك طالع من الموقع؟")) return;
+    var back = el.dataset.back;
+    toast("عم جيب موقعك…");
+    getPos().then(function (pos) { return api("visit_leave", Object.assign({ id: el.dataset.id }, pos || {})); }).then(function (j) {
+      toast("انسجّل الخروج ✓ " + (j.visit.leave_hm || ""));
+      return loadDay().then(function () { if (back === "site") openSiteSheet(j.visit.site_id, true); else render(); });
+    }).catch(fail);
+  },
+  pickSite: function (el) { var cb = S.pickCb; S.pickCb = null; closeSheet(); if (cb) cb(el.dataset.id); },
+  freeSite: function () { pickSiteThen(function (id) { doArriveThen(id, "", "site"); }, "", "بأي موقع إنت؟"); },
+  siteSheet: function (el) { openSiteSheet(el.dataset.site); },
+  sfMode: function (el) { S.sf.mode = el.dataset.m; drawSiteSheet(); },
+  sfAdd: function (el) { var k = el.dataset.k; S.sf.materials.push({ item: "", qty: "", kind: k, place: k === "used" ? "بالموقع" : k === "left" ? "بالموقع" : "بالموقع", source: "" }); drawSiteSheet(); },
+  sfDel: function (el) { S.sf.materials.splice(+el.dataset.i, 1); drawSiteSheet(); },
+  sfSave: saveSiteSheet,
+  sfExp: function (el) { openExpense(el.dataset.k, { site_id: S.sf.site_id }); },
+  sfPay: function () { openPayment({ site_id: S.sf.site_id }); },
+  fixGps: function (el) { api("site_fix_gps", { site_id: el.dataset.site }).then(function () { toast("انثبّت موقع الزبون ✓"); S.cache.customers = null; openSiteSheet(el.dataset.site, true); }, fail); },
+  fixApply: function (el) { api("fix_apply", { id: el.dataset.id }).then(function () { toast("انطبّق ✓"); S.cache.customers = null; openUnified(S.cache.unified && S.cache.unified.date); }, fail); },
+  unified: function () { openUnified(S.date); },
+  uniToLog: unifiedToLog,
+  printBlank: function (el) { loadCustomers().then(function () { printBlank(el.dataset.site); }); },
+  printNow: function () { document.body.classList.add("printing"); window.print(); setTimeout(function () { document.body.classList.remove("printing"); }, 800); },
   siteEdit: function (el) { openSite(el.dataset.c, el.dataset.id); },
   siteSave: saveSite,
   custNew: function (el) { openCustomer(null, el.dataset.back); },
@@ -947,7 +1194,7 @@ var ACT = {
   delItem: function (el) {
     if (!confirm("أكيد بدك تحذف؟")) return;
     var t = el.dataset.t;
-    api("delete", { table: t, id: el.dataset.id }).then(function () { toast("انحذف"); if (t === "site") { S.cache.customers = null; openCustomerDetail(el.dataset.c); } else { closeSheet(); render(); } }, fail);
+    api("delete", { table: t, id: el.dataset.id }).then(function () { toast("انحذف"); if (t === "site") { S.cache.customers = null; openCustomerDetail(el.dataset.c); } else if (t === "customer") { S.cache.customers = null; closeSheet(); render(); } else { closeSheet(); render(); } }, fail);
   },
   rv: function (el) { api("review", { table: el.dataset.t, id: el.dataset.id, status: el.dataset.s }).then(function () { toast(el.dataset.s === "approved" ? "اعتُمد ✓" : "انرفض"); render(); }, fail); },
   accOpen: function (el) { var n = el.dataset.n; api("balance", { name: n }).then(function (j) { sheet(sheetHead("حساب " + n) + accountHtml(n, j.balance, j.updated_at)); }, fail); },
@@ -995,7 +1242,7 @@ var ACT = {
       .then(function () { closeSheet(); toast("انحفظ ✓"); api("boot").then(function (j) { S.users = j.users; }); render(); }, function (e) { el.disabled = false; fail(e); });
   }
 };
-function kindsFor(k) { return k === "sheet" ? [["sheet", "وجه"], ["sheet", "ضهر"]] : S.form._type === "report" ? [["before", "قبل"], ["after", "منجز"]] : S.form._type === "payment" ? [["payment", "صورة"]] : [[S.form.kind === "fuel" ? "fuel" : "invoice", "الفاتورة"]]; }
+function kindsFor(k) { if (k === "work_ph") return [["before", "قبل"], ["after", "منجز"]]; if (k === "paper") return [["sheet", "وجه"], ["sheet", "ضهر"]]; return k === "sheet" ? [["sheet", "وجه"], ["sheet", "ضهر"]] : S.form._type === "report" ? [["before", "قبل"], ["after", "منجز"]] : S.form._type === "payment" ? [["payment", "صورة"]] : [[S.form.kind === "fuel" ? "fuel" : "invoice", "الفاتورة"]]; }
 
 document.addEventListener("click", function (e) {
   var el = e.target.closest("[data-act]");

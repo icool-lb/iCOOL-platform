@@ -62,7 +62,10 @@ begin
   adm := me.role = 'admin';
   d := coalesce(nullif(p->>'date', '')::date, (now() at time zone 'Asia/Beirut')::date);
 
-  if p_action = 'boot' then
+  if p_action in ('visit_arrive', 'visit_leave', 'site_fix_gps', 'sitesheet_get', 'sitesheet_save', 'fix_apply', 'unified') then
+    return dr.site_api(me, p_action, p, d);
+
+  elsif p_action = 'boot' then
     if boss then perform dr.gen_plans(); end if;
     return jsonb_build_object(
       'me', jsonb_build_object('id', me.id, 'name', me.name, 'role', me.role, 'platform_name', me.platform_name),
@@ -94,7 +97,10 @@ begin
       'payments', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('photos', dr.photo_json(x.photo_ids)) order by x.created_at), '[]')
                 from dr.payments x where x.date = d and (boss or x.user_id = me.id)),
       'daylogs', case when boss then (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object('sheet_photos', dr.photo_json(x.sheet_photo_ids))), '[]') from dr.daylogs x where x.date = d) else '[]' end,
-      'platform', case when boss then (select workers from dr.platform_days where date = d) end);
+      'platform', case when boss then (select workers from dr.platform_days where date = d) end,
+      'visits', (select coalesce(jsonb_agg(dr.visit_json(vv) order by vv.arrive_at), '[]') from dr.visits vv where vv.date = d and (boss or vv.user_id = me.id)),
+      'sheets', (select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'site_id', x.site_id, 'mode', x.mode, 'closed', x.closed, 'n_photos', cardinality(x.work_photo_ids) + cardinality(x.paper_photo_ids))), '[]')
+                from dr.site_sheets x where x.date = d and (boss or dr.can_site(me, x.site_id, d))));
 
   elsif p_action = 'range' then
     d2 := coalesce(nullif(p->>'to', '')::date, d + 6);
@@ -109,8 +115,7 @@ begin
 
   -- ---------- customers & sites ----------
   elsif p_action = 'customers' then
-    return (select coalesce(jsonb_agg(to_jsonb(c) || jsonb_build_object('sites', (select coalesce(jsonb_agg(to_jsonb(s) order by s.created_at), '[]') from dr.sites s where s.customer_id = c.id and s.active)) order by c.name), '[]') from dr.customers c
-            where boss or exists (select 1 from dr.tasks x where x.customer_id = c.id and me.id = any(x.assignees)));
+    return (select coalesce(jsonb_agg(to_jsonb(c) || jsonb_build_object('sites', (select coalesce(jsonb_agg(to_jsonb(s) order by s.created_at), '[]') from dr.sites s where s.customer_id = c.id and s.active)) order by c.name), '[]') from dr.customers c);
 
   elsif p_action = 'customer_get' then
     rid := (p->>'id')::uuid;
@@ -229,7 +234,7 @@ begin
     if length(trim(coalesce(p->>'source', ''))) < 2 then return '{"error":"bad","msg":"اكتب المصدر (المحل أو المحطة)"}'; end if;
     if coalesce(nullif(p->>'amount', '')::numeric, 0) <= 0 then return '{"error":"bad","msg":"اكتب المبلغ"}'; end if;
     insert into dr.expenses(user_id, date, kind, item, qty, amount, currency, source, paid_by, vehicle, customer_id, site_id, site, photo_ids)
-    values (me.id, d, p->>'kind', coalesce(nullif(trim(p->>'item'), ''), case when p->>'kind' = 'fuel' then 'محروقات' else 'بضاعة' end),
+    values (me.id, d, p->>'kind', coalesce(nullif(trim(p->>'item'), ''), case p->>'kind' when 'fuel' then 'محروقات' when 'repair' then 'تصليح' when 'other' then 'مصروف' else 'بضاعة' end),
       p->>'qty', (p->>'amount')::numeric, coalesce(nullif(p->>'currency', ''), '$'), trim(p->>'source'),
       coalesce(nullif(p->>'paid_by', ''), me.name), p->>'vehicle', coalesce((select customer_id from dr.sites where id = nullif(p->>'site_id', '')::uuid), nullif(p->>'customer_id', '')::uuid), nullif(p->>'site_id', '')::uuid, p->>'site', ids)
     returning id into rid;
@@ -239,8 +244,8 @@ begin
     select coalesce(array_agg(value::uuid), '{}') into ids from jsonb_array_elements_text(coalesce(p->'photo_ids', '[]'));
     if coalesce(nullif(p->>'amount', '')::numeric, 0) <= 0 then return '{"error":"bad","msg":"اكتب المبلغ"}'; end if;
     if length(trim(coalesce(p->>'party', ''))) < 2 then return '{"error":"bad","msg":"مين قبض/دفع؟"}'; end if;
-    insert into dr.payments(user_id, date, kind, party, amount, currency, note, photo_ids)
-    values (me.id, d, coalesce(nullif(p->>'kind', ''), 'other'), trim(p->>'party'), (p->>'amount')::numeric, coalesce(nullif(p->>'currency', ''), '$'), p->>'note', ids)
+    insert into dr.payments(user_id, date, kind, party, amount, currency, note, photo_ids, site_id)
+    values (me.id, d, coalesce(nullif(p->>'kind', ''), 'other'), trim(p->>'party'), (p->>'amount')::numeric, coalesce(nullif(p->>'currency', ''), '$'), p->>'note', ids, nullif(p->>'site_id', '')::uuid)
     returning id into rid;
     return jsonb_build_object('ok', true, 'id', rid);
 
@@ -260,8 +265,15 @@ begin
     elsif v = 'payment' then delete from dr.payments where id = rid and (adm or (user_id = me.id and status = 'pending'));
     elsif v = 'task' and boss then delete from dr.tasks where id = rid;
     elsif v = 'plan' and boss then delete from dr.plans where id = rid;
+    elsif v = 'customer' and adm then
+      if exists (select 1 from dr.tasks where customer_id = rid) or exists (select 1 from dr.reports where customer_id = rid)
+         or exists (select 1 from dr.expenses where customer_id = rid) or exists (select 1 from dr.plans where customer_id = rid)
+         or exists (select 1 from dr.visits v2 join dr.sites s2 on s2.id = v2.site_id where s2.customer_id = rid) then
+        return '{"error":"bad","msg":"عليه مهام أو تقارير أو مصاريف — ما بينحذف. وقّف مواقعه بدل الحذف."}';
+      end if;
+      delete from dr.customers where id = rid;
     elsif v = 'site' and adm then
-      if exists (select 1 from dr.tasks where site_id = rid) or exists (select 1 from dr.reports where site_id = rid) then
+      if exists (select 1 from dr.tasks where site_id = rid) or exists (select 1 from dr.reports where site_id = rid) or exists (select 1 from dr.visits where site_id = rid) or exists (select 1 from dr.site_sheets where site_id = rid) then
         update dr.sites set active = false, updated_at = now() where id = rid;
       else delete from dr.sites where id = rid; end if;
     else return '{"error":"forbidden"}'; end if;

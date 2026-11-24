@@ -161,3 +161,24 @@ h3{font-family:var(--f-display);font-size:16px;margin:14px 0 6px}
 .spin{display:inline-block;width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (min-width:700px){.kpis{grid-template-columns:repeat(6,1fr)}}
+
+/* site sheet / unified sheet / printable forms */
+.ut{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.ut th,.ut td{border:1px solid var(--line);padding:6px 6px;text-align:start;vertical-align:top}
+.ut th{background:var(--sunk);font-weight:700;font-size:12px}
+.pr-head{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:2px solid var(--blue);padding-bottom:8px;margin:6px 0 4px}
+.pr-head img{height:34px}
+.pform .ut td{height:22px}
+.pform h3{margin:8px 0 2px;font-size:14px}
+@media print{
+  @page{size:A4 portrait;margin:10mm}
+  html,body{background:#fff!important}
+  .pform .ut td{height:19px}
+  .ut th,.ut td{padding:3px 5px}
+  body>*:not(#sheet){display:none!important}
+  #sheet{background:#fff!important;position:static!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border-radius:0!important;padding:0!important;max-width:none!important}
+  .sheet-h,.sheet-f,.noprint,.banner,.sheet>:not(.printable){display:none!important}
+  .printable{display:block!important;color:#000}
+  .ut th,.ut td{border-color:#555}
+  .pr-head{border-color:#0066A7}
+}
