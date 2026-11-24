@@ -156,6 +156,8 @@ begin
       paper_photo_ids = excluded.paper_photo_ids, materials = excluded.materials, fixes = excluded.fixes, notes = excluded.notes,
       closed = excluded.closed, closed_at = excluded.closed_at, closed_by = excluded.closed_by, updated_by = me.id, updated_at = now()
     returning * into sh;
+    if p ? 'paper_read' then update dr.site_sheets set paper_read = p->'paper_read' where id = sh.id; end if;
+    perform dr.sheet_to_stock(sh.id, me.id);
     -- a missing phone is filled straight away; name/address changes wait for the admin
     if coalesce(trim(sh.fixes->>'phone'), '') <> '' then
       update dr.customers set phone = trim(sh.fixes->>'phone'), updated_at = now()

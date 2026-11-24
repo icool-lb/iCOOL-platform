@@ -65,6 +65,9 @@ begin
   if p_action in ('visit_arrive', 'visit_leave', 'site_fix_gps', 'sitesheet_get', 'sitesheet_save', 'fix_apply', 'unified') then
     return dr.site_api(me, p_action, p, d);
 
+  elsif p_action in ('stock', 'stock_count', 'stock_move') then
+    return dr.stock_api(me, p_action, p, d);
+
   elsif p_action = 'boot' then
     if boss then perform dr.gen_plans(); end if;
     return jsonb_build_object(

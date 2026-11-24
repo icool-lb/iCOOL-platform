@@ -187,12 +187,12 @@ function tryLogin() {
 function tabs() {
   if (isAdmin()) return [["today", "📋", "اليوم"], ["plan", "🗓️", "الجدول"], ["customers", "📍", "الزبائن"], ["log", "🧾", "الورقة"], ["review", "✅", "المراجعة"], ["more", "☰", "المزيد"]];
   if (isBoss()) return [["today", "📋", "اليوم"], ["plan", "🗓️", "الجدول"], ["customers", "📍", "الزبائن"], ["log", "🧾", "الورقة"], ["more", "☰", "المزيد"]];
-  return [["today", "📋", "مهامي"], ["account", "💵", "حسابي"], ["more", "☰", "المزيد"]];
+  return [["today", "📋", "مهامي"], ["stock", "🚐", "الجردة"], ["account", "💵", "حسابي"], ["more", "☰", "المزيد"]];
 }
-var TITLES = { today: "اليوم", plan: "جدول المهام", customers: "الزبائن والمواقع", log: "الورقة اليومية", review: "المراجعة", account: "حسابي", more: "المزيد", users: "المستخدمين" };
+var TITLES = { stock: "جردة السيارات والمحل", today: "اليوم", plan: "جدول المهام", customers: "الزبائن والمواقع", log: "الورقة اليومية", review: "المراجعة", account: "حسابي", more: "المزيد", users: "المستخدمين" };
 function go(v) {
   S.view = v; closeSheet();
-  $("#nav").innerHTML = tabs().map(function (t) { return '<button data-act="go" data-v="' + t[0] + '" class="' + (t[0] === v || (v === "users" && t[0] === "more") ? "on" : "") + '"><span class="ic">' + t[1] + "</span>" + t[2] + "</button>"; }).join("");
+  $("#nav").innerHTML = tabs().map(function (t) { return '<button data-act="go" data-v="' + t[0] + '" class="' + (t[0] === v || ((v === "users" || v === "stock") && t[0] === "more") ? "on" : "") + '"><span class="ic">' + t[1] + "</span>" + t[2] + "</button>"; }).join("");
   $("#barTitle").textContent = TITLES[v] || "";
   $("#barSub").textContent = dLabel(S.today);
   window.scrollTo(0, 0);
@@ -207,6 +207,7 @@ function render() {
   if (v === "review") return vReview(app);
   if (v === "account") return vAccount(app, S.me.platform_name);
   if (v === "users") return vUsers(app);
+  if (v === "stock") return vStock(app);
   return vMore(app);
 }
 function loading(app) { app.innerHTML = '<div class="empty" style="padding-top:60px"><span class="spin"></span></div>'; }
@@ -489,7 +490,7 @@ function openSiteSheet(siteId, keep) {
     if (!keep || !S.sf || S.sf.site_id !== siteId) {
       S.sf = { _type: "sitesheet", site_id: siteId, date: date, mode: sh ? sh.mode : "app", work: sh ? sh.work || "" : "",
         work_ph: sh ? sh.work_photos || [] : [], paper: sh ? sh.paper_photos || [] : [], materials: sh ? (sh.materials || []).map(function (m) { return Object.assign({}, m); }) : [],
-        fixes: Object.assign({ name: "", phone: "", address: "" }, sh ? sh.fixes || {} : {}), notes: sh ? sh.notes || "" : "", closed: sh ? sh.closed : false };
+        fixes: Object.assign({ name: "", phone: "", address: "" }, sh ? sh.fixes || {} : {}), notes: sh ? sh.notes || "" : "", closed: sh ? sh.closed : false, paper_read: sh ? sh.paper_read || null : null };
     }
     S.sf.data = d; S.form = S.sf;
     drawSiteSheet();
@@ -506,9 +507,11 @@ function drawSiteSheet() {
   h += '<h3>الدوام بالموقع</h3><div class="card tight">' + (d.visits.map(visitLine).join("") || '<div class="tiny muted">لسا حدا ما كبس «وصلت». الوقت والموقع بيتسجّلوا لحالن وما بيتعدّلوا.</div>') + "</div>";
   h += '<div class="seg" style="margin-top:12px"><button data-act="sfMode" data-m="app" class="' + (F.mode === "app" ? "on" : "") + '">📱 تعبئة من الموبايل</button><button data-act="sfMode" data-m="paper" class="' + (F.mode === "paper" ? "on" : "") + '">📄 ورقة مطبوعة + صورة</button></div>';
   if (F.mode === "paper") {
-    h += '<div class="card" style="margin-top:10px"><b>صوّر ورقة الموقع المعبّاية</b><div class="tiny muted">الوجهين، من فوق، كل الورقة بالكادر.</div>' + photoField("paper", [["sheet", "وجه"], ["sheet", "ضهر"]]) + '<div class="acts"><button class="btn sm" data-act="printBlank" data-site="' + s.id + '">🖨️ النموذج للطباعة</button></div></div>';
-    h += '<h3>صور الشغل المنجز</h3>' + photoField("work_ph", [["before", "قبل"], ["after", "منجز"]]);
-  } else {
+    h += '<div class="card" style="margin-top:10px"><b>صوّر ورقة الموقع المعبّاية</b><div class="tiny muted">الوجهين، من فوق، كل الورقة بالكادر.</div>' + photoField("paper", [["sheet", "وجه"], ["sheet", "ضهر"]]) + '<div class="acts"><button class="btn sm pri" data-act="sfRead">🔍 اقرا الورقة</button><button class="btn sm" data-act="printBlank" data-site="' + s.id + '">🖨️ النموذج للطباعة</button></div></div>';
+    h += paperReadHtml(F.paper_read);
+    if (!F.paper_read) h += '<h3>صور الشغل المنجز</h3>' + photoField("work_ph", [["before", "قبل"], ["after", "منجز"]]);
+  }
+  if (F.mode === "app" || F.paper_read) {
     h += '<label class="f"><span>الشغل المنجز اليوم <b class="req">*</b></span><textarea data-lf="work" placeholder="مثلاً: تمديد 40م كابل 6مم، تركيب لوحة DC، تجربة الإنفرتر">' + esc(F.work) + "</textarea></label>";
     h += '<div class="f"><span>صور الشغل <b class="req">* إلزامي</b></span>' + photoField("work_ph", [["before", "قبل"], ["after", "منجز"]]) + "</div>";
     h += '<div class="sec-h"><h3>البضاعة</h3><div class="row"><button class="btn sm" data-act="sfAdd" data-k="received">+ استلام</button><button class="btn sm" data-act="sfAdd" data-k="used">+ استعمال</button><button class="btn sm" data-act="sfAdd" data-k="left">+ باقي</button></div></div>';
@@ -542,7 +545,7 @@ function saveSiteSheet(btn) {
   btn.disabled = true;
   var mats = F.materials.filter(function (m) { return (m.item || "").trim(); });
   api("sitesheet_save", { site_id: F.site_id, date: F.date, mode: F.mode, work: F.work, work_photo_ids: F.work_ph.map(function (p) { return p.id; }), paper_photo_ids: F.paper.map(function (p) { return p.id; }),
-    materials: mats, fixes: F.fixes, notes: F.notes, close: close }).then(function () {
+    materials: mats, fixes: F.fixes, notes: F.notes, paper_read: F.paper_read || null, close: close }).then(function () {
     toast(close ? "تسكّرت ورقة الموقع ✓" : "انحفظت ✓");
     if (close) { S.sf = null; closeSheet(); render(); } else { btn.disabled = false; F.closed = false; }
   }, function (e) { btn.disabled = false; fail(e); });
@@ -587,7 +590,7 @@ function openUnified(date) {
       return '<div class="card tight" style="margin-top:8px"><div class="row between"><b>' + esc(c.name) + " — " + esc(st.label || "") + '</b><span class="chip ' + (x.closed ? "ok" : "warn") + '">' + (x.closed ? "مسكّرة" : "مسودة") + (x.mode === "paper" ? " · ورقة" : "") + "</span></div>" +
         (x.work ? '<div class="small" style="white-space:pre-wrap">' + esc(x.work) + "</div>" : "") + grp("received") + grp("used") + grp("left") +
         (hasFix ? '<div class="small" style="color:var(--or)">تصحيح معلومات: ' + esc([fx.name, fx.phone, fx.address].filter(Boolean).join(" · ")) + (isAdmin() ? ' <button class="btn sm" data-act="fixApply" data-id="' + x.id + '">طبّق</button>' : "") + "</div>" : "") +
-        '<div class="thumbs noprint">' + thumbs(x.work_photos) + thumbs(x.paper_photos) + '</div><div class="acts noprint"><button class="btn sm" data-act="siteSheet" data-site="' + x.site_id + '">فتح</button></div></div>';
+        paperReadHtml(x.paper_read) + '<div class="thumbs noprint">' + thumbs(x.work_photos) + thumbs(x.paper_photos) + '</div><div class="acts noprint"><button class="btn sm" data-act="siteSheet" data-site="' + x.site_id + '">فتح</button></div></div>';
     }).join("") || '<div class="tiny muted">ما في أوراق مواقع.</div>');
     var ex = u.expenses || [], py = u.payments || [];
     h += "<h3>مصاريف</h3>" + (ex.length ? '<table class="ut"><tr><th>البيان</th><th>الموقع</th><th>المصدر</th><th>مين دفع</th><th>المبلغ</th></tr>' + ex.map(function (e) { return "<tr><td>" + esc(e.item) + (e.vehicle ? " · " + esc(e.vehicle) : "") + "</td><td>" + esc((e.customer_name || "") + (e.site_label ? " — " + e.site_label : "") || e.site || "") + "</td><td>" + esc(e.source) + "</td><td>" + esc(e.paid_by || e.user_name) + '</td><td class="num">' + money(e.amount, e.currency) + "</td></tr>"; }).join("") + "</table>" : '<div class="tiny muted">ما في.</div>');
@@ -635,6 +638,91 @@ function printBlank(siteId) {
   sheet(h);
 }
 
+/* ---------------- handwriting reading (Claude via /api/read, same rules as منصة يوميات iCOOL) ---------------- */
+function readSheet(kind, photos, hint) {
+  if (!photos || !photos.length) return Promise.reject(new Error("صوّر الورقة أول"));
+  toast("عم إقرا الورقة… (دقيقة تقريباً)");
+  return fetch("/api/read", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: S.token, kind: kind, paths: photos.map(function (p) { return p.path; }), hint: hint || {} }) })
+    .then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.ok) throw new Error((j && j.msg) || "ما زبطت القراءة"); return j.data; }); }, function () { throw new Error("ما في إنترنت"); });
+}
+function normPlace(p) { return PLACES.indexOf(p) >= 0 ? p : "بالموقع"; }
+function applySiteRead(data) {
+  var F = S.sf, s = (F.data && F.data.site) || {}, c = s.customer || {};
+  var mats = (data.materials || []).filter(function (m) { return !m.crossed_out && (m.item || "").trim(); }).map(function (m) {
+    return { item: m.item, qty: m.qty || "", unit: m.unit || "", kind: MK[m.kind] ? m.kind : "used", place: normPlace(m.place), source: m.source || "", uncertain: m.uncertain || "" };
+  });
+  F.materials = F.materials.filter(function (m) { return (m.item || "").trim(); }).concat(mats);
+  if (!(F.work || "").trim() && data.work) F.work = data.work;
+  if (data.phone && !c.phone && !F.fixes.phone) F.fixes.phone = data.phone;
+  if (data.address && !F.fixes.address && data.address !== s.address) F.fixes.address = data.address;
+  if (data.customer && !F.fixes.name && normName(data.customer) !== normName(c.name)) F.fixes.name = data.customer;
+  if (data.notes) F.notes = ((F.notes || "") + (F.notes ? "\n" : "") + data.notes).trim();
+  F.paper_read = data;
+}
+function paperReadHtml(r) {
+  if (!r) return "";
+  var h = '<div class="card tight" style="margin-top:8px;background:var(--sunk)"><b class="small">📄 من الورقة المكتوبة</b>' + (r.confidence ? ' <span class="chip ' + (r.confidence === "high" ? "ok" : "warn") + '">' + ({ high: "واضحة", medium: "متوسطة", low: "صعبة" }[r.confidence] || r.confidence) + "</span>" : "");
+  if ((r.crew || []).length) h += '<div class="small">الفريق: ' + r.crew.map(function (w) { return esc(w.name + " " + (w.arrive || "") + "→" + (w.leave || "")); }).join("، ") + "</div>";
+  if ((r.expenses || []).length) h += '<div class="small">مصاريف مكتوبة: ' + r.expenses.map(function (e) { return esc((e.item || e.kind) + " " + e.amount + (e.currency === "LL" ? " ل.ل" : "$") + (e.paid_by ? " (" + e.paid_by + ")" : "")); }).join("، ") + "</div>";
+  if ((r.payments || []).length) h += '<div class="small">دفعات مكتوبة: ' + r.payments.map(function (p) { return esc((p.description || "") + " " + p.amount + (p.currency === "LL" ? " ل.ل" : "$") + (p.party ? " — " + p.party : "")); }).join("، ") + "</div>";
+  if ((r.doubts || []).length) h += '<div class="small" style="color:var(--or)">⚠️ ' + r.doubts.map(esc).join(" · ") + "</div>";
+  return h + "</div>";
+}
+
+/* ---------------- stock: vans, Rapids, pickup, store (جردة السيارات) ---------------- */
+var LOCS = ["الفان", "رابيد الفورمان", "رابيد المحل", "البيك أب", "المحل / المستودع"];
+function vStock(app) {
+  loading(app);
+  api("stock").then(function (d) {
+    S.cache.stock = d;
+    var loc = S.seg.loc || LOCS[0], bal = d.balance || [];
+    var h = '<div class="chips" style="margin-top:12px">' + LOCS.map(function (l) {
+      var n = bal.filter(function (b) { return b.location === l && +b.qty !== 0; }).length;
+      return '<button class="chip ' + (l === loc ? "blue" : "") + '" data-act="stLoc" data-l="' + esc(l) + '" style="cursor:pointer;border:0">' + esc(l) + (n ? " · " + n : "") + "</button>";
+    }).join("") + "</div>";
+    var rows = bal.filter(function (b) { return b.location === loc; });
+    h += '<div class="sec-h"><h2>' + esc(loc) + '</h2><div class="row"><button class="btn sm pri" data-act="stCount">📝 جرد</button><button class="btn sm" data-act="stMove">🔁 تحميل / تنزيل</button></div></div>';
+    h += rows.length ? '<table class="ut"><tr><th>الصنف</th><th>الكمية</th><th>آخر جرد</th></tr>' + rows.map(function (b) {
+      return "<tr" + (+b.qty < 0 ? ' style="color:var(--bad)"' : "") + "><td>" + esc(b.item) + '</td><td class="num">' + esc(+b.qty) + (b.unit ? " " + esc(b.unit) : "") + '</td><td class="tiny muted">' + (b.counted_at ? esc(dShort(b.counted_at.slice(0, 10))) : "ما انجرد") + "</td></tr>";
+    }).join("") + "</table>" : '<div class="card empty"><b>ما في جردة لهالمكان</b>كبّس «📝 جرد» وسجّل شو في هلّق. بعدها كل استلام واستعمال من أوراق المواقع بينزل لحالو.</div>';
+    if (rows.some(function (b) { return +b.qty < 0; })) h += '<div class="banner warn">في أصناف بالسالب: انصرفت أكتر من الموجود — اعمل جرد جديد.</div>';
+    var rec = (d.recent || []).filter(function (r) { return r.location === loc; }).slice(0, 25);
+    h += "<h3>آخر الحركات</h3>" + (rec.length ? '<div class="card tight">' + rec.map(function (r) {
+      var sign = r.kind === "in" ? "+" : r.kind === "out" ? "−" : "=";
+      return '<div class="li"><div class="m"><div class="t small">' + esc(r.item) + ' <b class="num">' + sign + esc(+r.qty) + "</b></div><div class=\"tiny muted\">" + esc(r.reason || "") + (r.site ? " · " + esc(r.site) : "") + " · " + esc(r.user_name || "") + " · " + esc(dShort(r.date)) + "</div></div></div>";
+    }).join("") + "</div>" : '<div class="tiny muted">ما في.</div>');
+    app.innerHTML = h;
+  }, function (e) { app.innerHTML = '<div class="banner bad">' + esc(e.message) + "</div>"; });
+}
+function stockItemsDl() { return '<datalist id="dl_items">' + ((S.cache.stock && S.cache.stock.items) || []).map(function (i) { return '<option value="' + esc(i) + '">'; }).join("") + "</datalist>"; }
+function stockRows(key) {
+  return S.form[key].map(function (r, i) {
+    return '<div class="f3"><label class="f"><span>الصنف</span><input list="dl_items" data-lf="' + key + "." + i + '.item" value="' + esc(r.item) + '"></label><label class="f"><span>الكمية</span><input inputmode="decimal" data-lf="' + key + "." + i + '.qty" value="' + esc(r.qty) + '"></label><label class="f"><span>الوحدة</span><input data-lf="' + key + "." + i + '.unit" value="' + esc(r.unit || "") + '" placeholder="م، حبة…"></label></div>';
+  }).join("");
+}
+function openStockCount() {
+  var loc = S.seg.loc || LOCS[0], bal = ((S.cache.stock && S.cache.stock.balance) || []).filter(function (b) { return b.location === loc; });
+  S.form = { _type: "stock", loc: loc, rows: bal.map(function (b) { return { item: b.item, qty: String(+b.qty < 0 ? 0 : +b.qty), unit: b.unit || "" }; }) };
+  if (!S.form.rows.length) S.form.rows.push({ item: "", qty: "", unit: "" });
+  drawStockCount();
+}
+function drawStockCount() {
+  var h = sheetHead("جرد " + S.form.loc) + '<div class="tiny muted">عدّ شو في فعلاً وصحّح الأرقام. الصنف يلّي خلص حطّلو 0.</div><div id="strows">' + stockRows("rows") + "</div>";
+  h += '<div class="acts"><button class="btn sm" data-act="stAddRow">+ صنف</button></div><label class="f"><span>ملاحظة</span><input id="st_note"></label>';
+  h += '<div class="sheet-f"><button class="btn pri" data-act="stCountSave">حفظ الجردة</button></div>' + stockItemsDl();
+  sheet(h);
+}
+function openStockMove() {
+  var loc = S.seg.loc || LOCS[0];
+  S.form = { _type: "stockmove", rows: [{ item: "", qty: "", unit: "" }] };
+  var opt = function (sel) { return '<option value="">— من برّا (مورد) / استعمال —</option>' + LOCS.map(function (l) { return "<option" + (l === sel ? " selected" : "") + ">" + esc(l) + "</option>"; }).join(""); };
+  var h = sheetHead("تحميل / تنزيل") + '<div class="f2"><label class="f"><span>من</span><select id="mv_from">' + opt("المحل / المستودع") + '</select></label><label class="f"><span>لـ</span><select id="mv_to">' + opt(loc === "المحل / المستودع" ? "الفان" : loc) + "</select></label></div>";
+  h += '<div id="strows">' + stockRows("rows") + '</div><div class="acts"><button class="btn sm" data-act="stAddRow">+ صنف</button></div><label class="f"><span>ملاحظة</span><input id="st_note" placeholder="مثلاً: بضاعة لورشة الدامور"></label>';
+  h += '<div class="sheet-f"><button class="btn pri" data-act="stMoveSave">حفظ</button></div>' + stockItemsDl();
+  sheet(h);
+}
+
 /* ---------------- daily log (foreman sheet) ---------------- */
 function vLog(app) {
   loading(app);
@@ -658,7 +746,7 @@ function drawLog(app, others) {
   if (S.me.role === "admin") { app.innerHTML = h; return; }
   h += '<div class="seg"><button data-act="logMode" data-m="paper" class="' + (F.mode === "paper" ? "on" : "") + '">📄 ورقة يدوية + صورة</button><button data-act="logMode" data-m="app" class="' + (F.mode === "app" ? "on" : "") + '">📱 تسجيل من الموبايل</button></div>';
   if (F.mode === "paper") {
-    h += '<div class="card" style="margin-top:12px"><b>صوّر الورقة (الوجهين)</b><div class="tiny muted">صورة واضحة، من فوق، كل الورقة بالكادر.</div>' + photoField("sheet", [["sheet", "وجه"], ["sheet", "ضهر"]]) + "</div>";
+    h += '<div class="card" style="margin-top:12px"><b>صوّر الورقة (الوجهين)</b><div class="tiny muted">صورة واضحة، من فوق، كل الورقة بالكادر.</div>' + photoField("sheet", [["sheet", "وجه"], ["sheet", "ضهر"]]) + '<div class="acts"><button class="btn sm pri" data-act="logRead">🔍 اقرا الورقة وعبّيها</button></div></div>';
   } else {
     h += '<div class="sec-h"><h3>العمال</h3><div class="row"><button class="btn sm" data-act="logFill">⤵︎ عبّي من المهام</button><button class="btn sm" data-act="logAdd" data-t="workers">+</button></div></div>';
     h += F.workers.map(function (w, i) {
@@ -819,6 +907,7 @@ function vMore(app) {
   h += '<div class="card" style="margin-top:10px">';
   if (isBoss() && S.me.platform_name) h += '<div class="li" data-act="go" data-v="account" style="cursor:pointer"><span>💵</span><div class="m t">حسابي</div><span>‹</span></div>';
   if (isAdmin()) h += '<div class="li" data-act="go" data-v="users" style="cursor:pointer"><span>👥</span><div class="m t">المستخدمين والرموز</div><span>‹</span></div><a class="li" href="' + esc(C.platformUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span>📊</span><div class="m t">منصة يوميات iCOOL</div><span>‹</span></a>';
+  if (isBoss()) h += '<div class="li" data-act="go" data-v="stock" style="cursor:pointer"><span>🚐</span><div class="m t">جردة السيارات والمحل</div><span>‹</span></div>';
   h += '<div class="li" data-act="pinChange" style="cursor:pointer"><span>🔑</span><div class="m t">غيّر رمز الدخول</div><span>‹</span></div>';
   h += '<div class="li" data-act="logout" style="cursor:pointer;color:var(--bad)"><span>⎋</span><div class="m t">خروج</div></div></div>';
   if (isBoss()) h += '<div id="syncSt" class="tiny muted" style="margin-top:10px"></div>';
@@ -1170,6 +1259,36 @@ var ACT = {
   fixApply: function (el) { api("fix_apply", { id: el.dataset.id }).then(function () { toast("انطبّق ✓"); S.cache.customers = null; openUnified(S.cache.unified && S.cache.unified.date); }, fail); },
   unified: function () { openUnified(S.date); },
   uniToLog: unifiedToLog,
+  sfRead: function (el) {
+    var F = S.sf; if (!F.paper.length) return toast("صوّر الورقة أول");
+    el.disabled = true; var s = F.data.site || {};
+    readSheet("site", F.paper, { date: F.date, customer: (s.customer || {}).name, site: siteText(s) }).then(function (data) {
+      applySiteRead(data); toast("انقرت ✓ — راجع وصحّح قبل الحفظ"); drawSiteSheet();
+    }, function (e) { el.disabled = false; fail(e); });
+  },
+  logRead: function (el) {
+    var F = S.form; if (!F.sheet.length) return toast("صوّر الورقة أول");
+    el.disabled = true;
+    readSheet("daylog", F.sheet, { date: F.date }).then(function (d) {
+      F.workers = (d.workers || []).map(function (w) { return { name: w.name || "", start: w.start || "", end: w.end || "", site: w.site || "", work: w.work || "", ot: w.ot == null ? "" : w.ot }; });
+      F.materials = (d.materials || []).filter(function (m) { return !m.crossed_out; }).map(function (m) { return { item: m.item || "", qty: m.qty || "", source: m.source || "", site: m.site || "" }; });
+      F.payments = (d.payments || []).filter(function (p) { return !p.crossed_out; }).map(function (p) { return { description: p.description || "", amount: p.amount || "", currency: p.currency === "LL" ? "LL" : "$", party: p.party || "" }; });
+      if ((d.doubts || []).length) F.notes = ((F.notes || "") + "\nشكوك القراءة: " + d.doubts.join(" · ")).trim();
+      F.mode = "app"; drawLog($("#app"), []); toast("انقرت الورقة ✓ — راجع كل سطر قبل التسكير");
+    }, function (e) { el.disabled = false; fail(e); });
+  },
+  stLoc: function (el) { S.seg.loc = el.dataset.l; vStock($("#app")); },
+  stCount: openStockCount,
+  stMove: openStockMove,
+  stAddRow: function () { S.form.rows.push({ item: "", qty: "", unit: "" }); $("#strows").innerHTML = stockRows("rows"); },
+  stCountSave: function (el) {
+    el.disabled = true;
+    api("stock_count", { location: S.form.loc, items: S.form.rows, note: val("st_note") }).then(function (j) { closeSheet(); toast("انحفظت الجردة ✓ (" + j.n + " صنف)"); vStock($("#app")); }, function (e) { el.disabled = false; fail(e); });
+  },
+  stMoveSave: function (el) {
+    el.disabled = true;
+    api("stock_move", { from: val("mv_from"), to: val("mv_to"), items: S.form.rows, note: val("st_note") }).then(function (j) { closeSheet(); toast("انسجّلت ✓ (" + j.n + " صنف)"); vStock($("#app")); }, function (e) { el.disabled = false; fail(e); });
+  },
   printBlank: function (el) { loadCustomers().then(function () { printBlank(el.dataset.site); }); },
   printNow: function () { document.body.classList.add("printing"); window.print(); setTimeout(function () { document.body.classList.remove("printing"); }, 800); },
   siteEdit: function (el) { openSite(el.dataset.c, el.dataset.id); },
