@@ -217,22 +217,48 @@ textarea{font:inherit;color:inherit;width:100%;padding:10px 12px;border:1.5px so
 .ac-nav{margin-top:14px}.ac-nav .sp,.st-act .sp{flex:1}
 
 /* ===== certificate ===== */
-.cert{max-width:760px;margin:14px auto;padding:10px;border-radius:14px;background:linear-gradient(135deg,#0066A7,#F1471E)}
-.cert-in{background:#fffdf8;color:#0D2132;border-radius:8px;padding:28px 24px;text-align:center;position:relative;overflow:hidden}
-.cert-in::before{content:"";position:absolute;inset:10px;border:1.5px solid #c9a24a;border-radius:4px;pointer-events:none}
-.cert-top{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800;letter-spacing:.2em;color:#0066A7}
-.cert-top img{height:42px}
-.cert-k{font-family:var(--f-display);font-size:1.9rem;font-weight:800;margin-top:14px}
-.cert-en{font-size:.9rem;letter-spacing:.25em;color:#8a6d2b;text-transform:uppercase}
-.cert-l{margin:14px 0 2px;color:#566A7C}
-.cert-name{font-family:var(--f-display);font-size:1.8rem;font-weight:700;color:#0066A7;border-bottom:1.5px solid #c9a24a;display:inline-block;padding:0 18px 4px}
-.cert-title{font-size:1.15rem;font-weight:700}
-.cert-row{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;margin-top:18px}
-.cert-row small{display:block;color:#566A7C;font-size:.75rem}
-.cert-ver{margin-top:16px;font-size:.72rem;color:#566A7C;word-break:break-all}
+
+
+
+
+
+
+
+
+
+
+
+
+
+.cert{max-width:600px;margin:14px auto;container-type:inline-size;font-family:"Cairo","IBM Plex Sans Arabic",sans-serif}
+.cert-in{position:relative;aspect-ratio:1/1.414;background:#fff;color:#14222f;overflow:hidden;box-shadow:0 6px 24px rgba(13,33,50,.18);border-radius:2px;display:flex;flex-direction:column;align-items:center;text-align:center;padding:9cqw 9cqw 7cqw}
+.cert-in::before{content:"";position:absolute;inset:2.6cqw;border:.5cqw solid #0066A7;pointer-events:none}
+.cert-in::after{content:"";position:absolute;inset:3.8cqw;border:.18cqw solid #c9a24a;pointer-events:none}
+.cert-c{position:absolute;width:9cqw;height:9cqw;border-color:#F1471E;border-style:solid;border-width:0;z-index:1}
+.cert-c.c-tl{top:2.6cqw;left:2.6cqw;border-top-width:1.1cqw;border-left-width:1.1cqw}.cert-c.c-tr{top:2.6cqw;right:2.6cqw;border-top-width:1.1cqw;border-right-width:1.1cqw}
+.cert-c.c-bl{bottom:2.6cqw;left:2.6cqw;border-bottom-width:1.1cqw;border-left-width:1.1cqw}.cert-c.c-br{bottom:2.6cqw;right:2.6cqw;border-bottom-width:1.1cqw;border-right-width:1.1cqw}
+.cert-wm{position:absolute;top:38%;left:50%;width:70%;transform:translate(-50%,-50%) rotate(22deg);opacity:.07;pointer-events:none}
+.cert-logo{height:13cqw;width:auto;position:relative}
+.cert-acad{margin-top:1.6cqw;font-size:2.7cqw;font-weight:700;color:#0066A7;letter-spacing:.06em}
+.cert-k{margin-top:5cqw;font-size:10.5cqw;font-weight:800;line-height:1.1;color:#0066A7}
+.cert-en{margin-top:1.2cqw;font-size:2.5cqw;font-weight:700;letter-spacing:.42em;color:#F1471E;direction:ltr}
+.cert-orn{display:flex;align-items:center;gap:2cqw;width:46%;margin:3.2cqw auto 0;color:#c9a24a}
+.cert-orn::before,.cert-orn::after{content:"";flex:1;height:.25cqw;background:currentColor}
+.cert-orn i{width:1.6cqw;height:1.6cqw;background:currentColor;transform:rotate(45deg)}
+.cert-l{margin-top:4.5cqw;font-size:3.6cqw;color:#5b6977;font-weight:500}
+.cert-name{margin-top:1.4cqw;font-size:8.2cqw;font-weight:800;line-height:1.25;color:#14222f;padding:0 4cqw 1.2cqw;border-bottom:.35cqw solid #c9a24a;max-width:100%}
+.cert-l2{margin-top:4cqw;font-size:3.6cqw;color:#5b6977;font-weight:500}
+.cert-title{margin-top:1.2cqw;font-size:5.4cqw;font-weight:800;color:#0066A7;line-height:1.35}
+.cert-foot{margin-top:auto;width:100%;display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:3cqw}
+.cert-f{font-size:2.6cqw;color:#5b6977;line-height:1.5}
+.cert-f b{display:block;font-size:3.1cqw;color:#14222f;font-weight:700;border-top:.25cqw solid #14222f;padding-top:1cqw;margin-top:5cqw;white-space:nowrap}
+.cert-f .mono{font-family:"IBM Plex Mono",monospace;letter-spacing:.02em}
+.cert-seal{width:22cqw;height:22cqw}
+.cert-ver{position:relative;margin-top:3.5cqw;font-size:2.2cqw;color:#5b6977;line-height:1.5}
+.cert-ver span{display:block;font-family:"IBM Plex Mono",monospace;font-size:2cqw;color:#0066A7}
 .cert-verify{position:fixed;inset:0;z-index:200;background:var(--bg);overflow:auto;padding:24px 16px}
-@media print{body.printing-cert *{visibility:hidden}body.printing-cert #cert-card,body.printing-cert #cert-card *{visibility:visible}body.printing-cert #cert-card{position:fixed;inset:0;margin:auto;max-width:none;width:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-@media (max-width:560px){.ac-hero{flex-direction:column;align-items:flex-start}.cert-k{font-size:1.5rem}.cert-name{font-size:1.4rem}}
+@media print{@page{size:A4 portrait;margin:0}html:has(body.printing-cert),body.printing-cert{height:297mm;overflow:hidden;background:#fff}body.printing-cert *{visibility:hidden}body.printing-cert #cert-card,body.printing-cert #cert-card *{visibility:visible}body.printing-cert #cert-card{position:fixed;top:0;left:0;margin:0;width:210mm;height:297mm;max-width:none;print-color-adjust:exact;-webkit-print-color-adjust:exact}body.printing-cert .cert-in{box-shadow:none;border-radius:0;aspect-ratio:auto;height:297mm}}
+@media (max-width:560px){.ac-hero{flex-direction:column;align-items:flex-start}}
 
 /* ===== academy lesson v2: sections, slides, visuals, one-by-one quiz ===== */
 .ac-secs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:4px -4px 12px;padding:4px;position:sticky;top:0;z-index:5;background:var(--surface)}

@@ -178,16 +178,36 @@ function claim(cid) {
     I().closeSheet(); await loadState(); go({ v: "cert", c: cid });
   });
 }
+function certSeal(score) {
+  const ring = "iCOOL ACADEMY ★ CERTIFIED ★ iCOOL ACADEMY ★ CERTIFIED ★";
+  return `<svg class="cert-seal" viewBox="0 0 200 200" aria-hidden="true"><defs><path id="cs-r" d="M100,100 m-72,0 a72,72 0 1,1 144,0 a72,72 0 1,1 -144,0"/></defs>
+    <circle cx="100" cy="100" r="96" fill="#0066A7"/><circle cx="100" cy="100" r="88" fill="none" stroke="#c9a24a" stroke-width="2"/>
+    <circle cx="100" cy="100" r="58" fill="#fff"/><circle cx="100" cy="100" r="52" fill="none" stroke="#F1471E" stroke-width="3"/>
+    <text direction="ltr" font-family="Cairo,sans-serif" font-size="14" font-weight="700" fill="#fff"><textPath href="#cs-r" textLength="448" lengthAdjust="spacing">${ring}</textPath></text>
+    ${score != null ? `<text x="100" y="104" text-anchor="middle" font-family="Cairo,sans-serif" font-size="34" font-weight="800" fill="#0066A7">${score}%</text><text x="100" y="128" text-anchor="middle" font-family="Cairo,sans-serif" font-size="15" font-weight="700" fill="#F1471E">المعدل</text>`
+      : `<text x="100" y="112" text-anchor="middle" font-family="Cairo,sans-serif" font-size="26" font-weight="800" fill="#0066A7">معتمد</text>`}</svg>`;
+}
 function certHTML(ce) {
   const url = `${location.origin}${location.pathname}?cert=${encodeURIComponent(ce.serial)}`;
-  const dt = new Date(ce.issued_at).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+  const dt = new Date(ce.issued_at).toLocaleDateString("ar-LB-u-nu-latn", { day: "numeric", month: "long", year: "numeric" });
+  const lg = logoSrc();
   return `<div class="cert" id="cert-card"><div class="cert-in">
-    <div class="cert-top"><img src="${logoSrc()}" alt="iCOOL"><span>iCOOL ACADEMY</span></div>
-    <div class="cert-k">شهادة إتمام</div><div class="cert-en">Certificate of Completion</div>
-    <p class="cert-l">تشهد أكاديمية iCOOL بأن</p><div class="cert-name">${esc(ce.name)}</div>
-    <p class="cert-l">أتمّ بنجاح متطلبات</p><div class="cert-title">${esc(ce.title)}</div>
-    <div class="cert-row"><div><small>التاريخ</small><b dir="ltr">${dt}</b></div>${ce.score != null ? `<div><small>المعدل</small><b dir="ltr">${ce.score}%</b></div>` : ""}<div><small>الرقم التسلسلي</small><b class="mono">${esc(ce.serial)}</b></div></div>
-    <div class="cert-ver">للتحقق: <span dir="ltr">${esc(url)}</span></div></div></div>`;
+    <span class="cert-c c-tl"></span><span class="cert-c c-tr"></span><span class="cert-c c-bl"></span><span class="cert-c c-br"></span>
+    ${lg ? `<img class="cert-wm" src="${lg}" alt=""><img class="cert-logo" src="${lg}" alt="iCOOL">` : ""}
+    <div class="cert-acad">أكاديمية iCOOL للتدريب الفني</div>
+    <div class="cert-k">شهادة إتمام</div><div class="cert-en">CERTIFICATE OF COMPLETION</div>
+    <div class="cert-orn"><i></i></div>
+    <div class="cert-l">تشهد أكاديمية iCOOL بأنّ الفني</div>
+    <div class="cert-name">${esc(ce.name)}</div>
+    <div class="cert-l2">قد أتمّ بنجاح جميع دروس واختبارات</div>
+    <div class="cert-title">${esc(ce.title)}</div>
+    <div class="cert-foot">
+      <div class="cert-f">تاريخ الإصدار<b>${dt}</b></div>
+      ${certSeal(ce.score)}
+      <div class="cert-f">الرقم التسلسلي<b class="mono" dir="ltr">${esc(ce.serial)}</b></div>
+    </div>
+    <div class="cert-ver">للتحقق من صحة الشهادة<span dir="ltr">${esc(url.replace(/^https?:\/\//, ""))}</span></div>
+  </div></div>`;
 }
 function certView() {
   const ce = cert(VIEW.c); if (!ce) return go({ v: "home" });
